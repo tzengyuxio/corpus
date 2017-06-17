@@ -4,7 +4,8 @@
 
 import sqlite3
 import sys
-import time
+from random import randint
+from time import sleep
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
@@ -84,14 +85,22 @@ class Books():
     """
 
     def __init__(self, writer):
-        self.books = {}
-        self.rankings = {}
         self.writer = writer
+        self.urlopen_count = 0
+
+    def sleep(self):
+        """sleep
+        """
+        self.urlopen_count += 1
+        if self.urlopen_count % 10 == 0:
+            sleep(7)
+        else:
+            sleep(randint(2, 4))
 
     def test_book(self, book_no):
         """test_book
         """
-        time.sleep(2)
+        self.sleep()
         url = SERIALTEXT.format(book_no)
         try:
             soup = BeautifulSoup(urlopen(url), PARSER)
@@ -105,7 +114,7 @@ class Books():
     def fetch_book(self, book_no, title, author):
         """fetch_book
         """
-        print('[INFO] Processing Book[{0}] {1}'.format(
+        print('[INFO]   Fetching Book[{0}] {1}'.format(
             book_no, title), end='', flush=True)
         if self.writer.contains_book(book_no):
             print(' -> contained and skip')
@@ -115,11 +124,10 @@ class Books():
             self.writer.write_book(book_no, title, author, page_count, '')
             print(' -> no preview')
             return
-        time.sleep(2)
         text = '{0}\n\n{1}\n'.format(title, author)
         for i in range(1, page_count + 1):
             print('.', end='', flush=True)
-            time.sleep(2)
+            self.sleep()
             url = SERIALTEXT_PAGE.format(book_no, i)
             soup = BeautifulSoup(urlopen(url), PARSER)
             cont = soup.find_all('div', {'class': 'cont'})[-1].text
@@ -133,7 +141,7 @@ class Books():
         """fetch_mont
         """
         print('[INFO] Processing Top100 of {0}/{1:00}'.format(year, month))
-        time.sleep(2)
+        self.sleep()
         url = MONTHTOPB.format(year, month)
         soup = BeautifulSoup(urlopen(url), PARSER)
         for div in soup.find_all('div', {'class': 'type02_bd-a'}):
