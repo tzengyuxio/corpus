@@ -28,13 +28,13 @@ CREATE TABLE IF NOT EXISTS
     PRIMARY KEY(book_no))
 '''
 SQL_INSERT_BOOK_TOPS = '''
-INSERT OR IGNORE INTO book_tops VALUES ({0}, {1}, {2}, '{3}', '{4}', '{5}')
+INSERT OR IGNORE INTO book_tops VALUES (?, ?, ?, ?, ?, ?)
 '''
 SQL_INSERT_BOOKS = '''
-INSERT OR IGNORE INTO books VALUES ('{0}', '{1}', '{2}', {3}, '{4}')
+INSERT OR IGNORE INTO books VALUES (?, ?, ?, ?, ?)
 '''
 SQL_EXISTS_BOOKS = '''
-SELECT 1 FROM books WHERE book_no='{0}'
+SELECT 1 FROM books WHERE book_no=?
 '''
 
 
@@ -54,8 +54,8 @@ class SqliteWriter():
         """write_ranking
         """
         cur = self.conn.cursor()
-        cur.execute(SQL_INSERT_BOOK_TOPS.format(
-            year, month, top_no, book_no, title, author))
+        cur.execute(SQL_INSERT_BOOK_TOPS, (year, month,
+                                           top_no, book_no, title, author))
         self.conn.commit()
         cur.close()
 
@@ -63,7 +63,8 @@ class SqliteWriter():
         """write_book
         """
         cur = self.conn.cursor()
-        cur.execute(SQL_INSERT_BOOKS.format(book_no, title, author, page_count, cont))
+        cur.execute(SQL_INSERT_BOOKS,
+                    (book_no, title, author, page_count, cont))
         self.conn.commit()
         cur.close()
 
@@ -71,9 +72,9 @@ class SqliteWriter():
         """contains_book
         """
         cur = self.conn.cursor()
-        cur.execute(SQL_EXISTS_BOOKS.format(book_no))
+        cur.execute(SQL_EXISTS_BOOKS, [book_no])
         self.conn.commit()
-        result = True if cur.rowcount == 1 else False
+        result = True if cur.fetchone() is not None else False
         cur.close()
         return result
 
@@ -99,20 +100,25 @@ class Books():
             soup.decompose()
             return page_count
         except HTTPError:
-            return -1
+            return 0
 
     def fetch_book(self, book_no, title, author):
         """fetch_book
         """
+        print('[INFO] Processing Book[{0}] {1}'.format(
+            book_no, title), end='', flush=True)
         if self.writer.contains_book(book_no):
+            print(' -> contained and skip')
             return
         page_count = self.test_book(book_no)
         if page_count <= 0:
             self.writer.write_book(book_no, title, author, page_count, '')
+            print(' -> no preview')
             return
         time.sleep(2)
         text = '{0}\n\n{1}\n'.format(title, author)
         for i in range(1, page_count + 1):
+            print('.', end='', flush=True)
             time.sleep(2)
             url = SERIALTEXT_PAGE.format(book_no, i)
             soup = BeautifulSoup(urlopen(url), PARSER)
@@ -120,14 +126,15 @@ class Books():
             text += cont
             soup.decompose()
         self.writer.write_book(book_no, title, author, page_count, text)
+        print('saved')
         return
 
     def fetch_month(self, year, month):
         """fetch_mont
         """
+        print('[INFO] Processing Top100 of {0}/{1:00}'.format(year, month))
         time.sleep(2)
         url = MONTHTOPB.format(year, month)
-        print(url)
         soup = BeautifulSoup(urlopen(url), PARSER)
         for div in soup.find_all('div', {'class': 'type02_bd-a'}):
             top_no = div.parent.find_all('strong', {'class': 'no'})[0].text
@@ -135,8 +142,8 @@ class Books():
             author = div.ul.li.text[3:]
             href = div.h4.a.get('href')
             book_no = href.rsplit('/', 1)[-1].split('?')[0]
-            print(top_no, ":", book_no, title, author)
             self.writer.write_top(year, month, top_no, book_no, title, author)
+            self.fetch_book(book_no, title, author)
         soup.decompose()
 
     def fetch_all(self):
@@ -167,7 +174,7 @@ if __name__ == '__main__':
         WRITER = SqliteWriter()
         BOOK = Books(WRITER)
         # BOOK.fetch_all()
-        # BOOK.fetch_month(2017, 4)
+        BOOK.fetch_month(2017, 4)
         # print(BOOK.test_book('0010723234'))
         # print(BOOK.fetch_book('0010723234', '為了活下去：脫北女孩朴研美', '朴研美', 5))
-        BOOK.fetch_book('0010723234', '為了活下去：脫北女孩朴研美', '朴研美')
+        # BOOK.fetch_book('0010723234', '為了活下去：脫北女孩朴研美', '朴研美')
