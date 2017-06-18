@@ -178,11 +178,11 @@ class MagCnyes():
         """
         self.urlopen_count += 1
         if self.urlopen_count % 100 == 0:
-            for _ in range(0, randint(24, 36), 2):
+            for _ in range(0, randint(30, 90), 2):
                 print('=', end='', flush=True)
                 sleep(2)
         elif self.urlopen_count % 10 == 0:
-            for _ in range(randint(12, 20)):
+            for _ in range(randint(5, 9)):
                 print('-', end='', flush=True)
                 sleep(1)
         else:
@@ -202,15 +202,15 @@ class MagCnyes():
         url_page = url_first
         while url_page is not None:
             print('.', end='', flush=True)
-            self.sleep()
+            # self.sleep()
             url = urljoin(url_base, url_page)
-            # print(url)
             soup = BeautifulSoup(urlopen(url), PARSER)
             text += soup.find_all('div', {'class': 'content'})[0].text
             bnext_btns = soup.find_all('a', {'class': 'bnext'})
             url_page = None if len(
                 bnext_btns) == 0 else bnext_btns[0].get('href')
             soup.decompose()
+        self.sleep()
 
         # write
         self.writer.write_article(
@@ -247,8 +247,8 @@ class MagCnyes():
     def fetch_all(self):
         """fetch_all
         """
-        start = (2017, 4)
-        end = (2017, 5)
+        start = (2013, 7)
+        end = (2016, 12)
         for year in range(start[0], end[0] + 1):
             start_month = start[1] if year == start[0] else 1
             end_month = end[1] if year == end[0] else 13
@@ -281,8 +281,8 @@ if __name__ == '__main__':
     elif sys.argv[1] == 'fetch':
         WRITER = SqliteWriter()
         MAG = MagCnyes(WRITER)
-        # MAG.fetch_all()
-        MAG.fetch_month(2017, 4, 7)
+        MAG.fetch_all()
+        # MAG.fetch_month(2017, 4, 7)
         # print(BOOK.test_book('0010723234'))
         # print(BOOK.fetch_book('0010723234', '為了活下去：脫北女孩朴研美', '朴研美', 5))
         # BOOK.fetch_book('0010723234', '為了活下去：脫北女孩朴研美', '朴研美')
