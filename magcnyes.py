@@ -222,7 +222,7 @@ class MagCnyes():
         """fetch_mont
         """
         print('{0} [INFO] Processing Top100 of {1}-{2:02} at {3}'.format(
-            datetime_iso(), year, month, self.columns[col_id]))
+            datetime_iso(), year, month, self.columns[col_id]), end='', flush=True)
         page_size = 100
         start_date, end_date = month_range(year, month)
         req_body_json = '{{"Start":"{2}","End":"{3}","ColumnID":{0},"PageSize":{1},"PageIndex":1}}'
@@ -232,6 +232,10 @@ class MagCnyes():
         req.add_header('Content-Type', 'application/json')
         with urlopen(req) as resp:
             data = json.loads(resp.read().decode('utf-8'))['d']
+            if data['List'] is None:
+                print(' -> No List')
+                return
+            print(' -> {0} articles'.format(len(data['List'])))
             for idx, art in enumerate(data['List']):
                 art_id = art['ArticleID']
                 full_title = art['FullTitle']
