@@ -87,12 +87,17 @@ class SqliteWriter():
     """
 
     def __init__(self):
-        self.conn = sqlite3.connect('corpus.db')
+        self.conn = sqlite3.connect('books.db')
         cur = self.conn.cursor()
         cur.execute(SQL_CREATE_BOOK_TOPS)
         cur.execute(SQL_CREATE_BOOKS)
-        cur.execute(SQL_CREATE_CORPUS)
         self.conn.commit()
+        cur.close()
+
+        self.corpus = sqlite3.connect('corpus.db')
+        cur = self.corpus.cursor()
+        cur.execute(SQL_CREATE_CORPUS)
+        self.corpus.commit()
         cur.close()
 
     def write_top(self, year, month, top_no, book_no, title, author):
@@ -144,12 +149,12 @@ class SqliteWriter():
             num_hanzi = sum(char_freq_table.values())
             num_unique = len(char_freq_table)
             stats = json.dumps(char_freq_table, sort_keys=True)
-            cur_ins = self.conn.cursor()
+            cur_ins = self.corpus.cursor()
             cur_ins.execute(SQL_INSERT_CORPUS, (src, idx, raw_text,
                                                 stats, num_char, num_hanzi, num_unique))
             print('{0} [INFO] Calc book[{1}] ... num(char/hanzi/unique) = {2}/{3}/{4}'.format(
                 datetime_iso(), row[0], num_char, num_hanzi, num_unique))
-            self.conn.commit()
+            self.corpus.commit()
             cur_ins.close()
         cur.close()
 
