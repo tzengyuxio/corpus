@@ -2,6 +2,7 @@
 """Crawler of Books.com
 """
 
+import json
 import logging
 import sqlite3
 import sys
@@ -44,6 +45,9 @@ INSERT OR IGNORE INTO book_tops VALUES (?, ?, ?, ?, ?, ?)
 SQL_INSERT_BOOKS = '''
 INSERT OR IGNORE INTO books VALUES (?, ?, ?, ?, ?)
 '''
+SQL_INSERT_CORPUS = '''
+INSERT OR IGNORE INTO corpus VALUES (?, ?, ?, ?, ?, ?, ?)
+'''
 SQL_EXISTS_BOOKS = '''
 SELECT 1 FROM books WHERE book_no=?
 '''
@@ -56,6 +60,26 @@ def datetime_iso():
     """datetime_iso
     """
     return datetime.now().replace(microsecond=0).isoformat(' ')
+
+
+def is_unihan(char):
+    """check a char is hanzi or not
+    """
+    return ('\u4e00' <= char <= '\u9fff' or
+            is_unihan_ext(char))
+
+
+def is_unihan_ext(char):
+    """
+    CJK Unified Ideographs Extension A: '\U00003400' <= char <= '\U00004dbf'
+    CJK Unified Ideographs Extension B: '\U00020000' <= char <= '\U0002a6df'
+    CJK Unified Ideographs Extension C: '\U0002a700' <= char <= '\U0002b73f'
+    CJK Unified Ideographs Extension D: '\U0002b740' <= char <= '\U0002b81f'
+    CJK Unified Ideographs Extension E: '\U0002b820' <= char <= '\U0002ceaf'
+    """
+    return ('\u3400' <= char <= '\u4dbf' or  # CJK Unified Ideographs Extension A
+            '\U00020000' <= char <= '\U0002a6df' or  # CJK Unified Ideographs Extension B
+            '\U0002a700' <= char <= '\U0002ceaf')  # CJK Unified Ideographs Extension C,D,E
 
 
 class SqliteWriter():
@@ -104,7 +128,29 @@ class SqliteWriter():
         """
         cur = self.conn.cursor()
         for row in cur.execute(SQL_SELECT_BOOKS):
-            print('{0} [INFO] Calc book[{1}]'.format(datetime_iso(), row[0]))
+            src = 'books'
+            idx = row[0]
+            raw_text = '{0}\n\n{1}\n{2}'.format(row[1], row[2], row[4])
+            trimed_text = raw_text.replace(' ', '').replace('\n', '')
+            num_char = len(trimed_text)
+            char_freq_table = {}
+            for char in trimed_text:
+                if char in char_freq_table:
+                    char_freq_table[char] += 1
+                else:
+                    char_freq_table[char] = 1
+            char_freq_table = {k: v for k,
+                               v in char_freq_table.items() if is_unihan(k)}
+            num_hanzi = sum(char_freq_table.values())
+            num_unique = len(char_freq_table)
+            stats = json.dumps(char_freq_table, sort_keys=True)
+            cur_ins = self.conn.cursor()
+            cur_ins.execute(SQL_INSERT_CORPUS, (src, idx, raw_text,
+                                                stats, num_char, num_hanzi, num_unique))
+            print('{0} [INFO] Calc book[{1}] ... num(char/hanzi/unique) = {2}/{3}/{4}'.format(
+                datetime_iso(), row[0], num_char, num_hanzi, num_unique))
+            self.conn.commit()
+            cur_ins.close()
         cur.close()
 
 
