@@ -153,12 +153,12 @@ class SqliteWriter():
             num_hanzi = sum(char_freq_table.values())
             num_unique = len(char_freq_table)
             stats = json.dumps(char_freq_table, sort_keys=True)
-            cur_ins = self.conn.cursor()
+            cur_ins = self.corpus.cursor()
             cur_ins.execute(SQL_INSERT_CORPUS, (src, idx, raw_text,
                                                 stats, num_char, num_hanzi, num_unique))
             print('{0} [INFO] Calc article[{1}] ... num(char/hanzi/unique) = {2}/{3}/{4}'.format(
                 datetime_iso(), row[0], num_char, num_hanzi, num_unique))
-            self.conn.commit()
+            self.corpus.commit()
             cur_ins.close()
         cur.close()
 
