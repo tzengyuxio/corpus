@@ -2,10 +2,10 @@
 """Crawler of Books.com
 """
 
-import datetime
 import logging
 import sqlite3
 import sys
+from datetime import datetime
 from random import randint
 from time import sleep
 from urllib.error import HTTPError
@@ -39,6 +39,12 @@ INSERT OR IGNORE INTO books VALUES (?, ?, ?, ?, ?)
 SQL_EXISTS_BOOKS = '''
 SELECT 1 FROM books WHERE book_no=?
 '''
+
+
+def datetime_iso():
+    """datetime_iso
+    """
+    return datetime.now().replace(microsecond=0).isoformat(' ')
 
 
 class SqliteWriter():
@@ -97,9 +103,11 @@ class Books():
         """
         self.urlopen_count += 1
         if self.urlopen_count % 10 == 0:
-            sleep(7)
+            for _ in range(12):
+                print('-', end='', flush=True)
+                sleep(1)
         else:
-            sleep(randint(2, 4))
+            sleep(randint(3, 5))
 
     def test_book(self, book_no):
         """test_book
@@ -119,7 +127,7 @@ class Books():
         """fetch_book
         """
         print('{0} [INFO]   Fetching Book[{1}] {2}'.format(
-            datetime.datetime.now().isoformat(), book_no, title), end='', flush=True)
+            datetime_iso(), book_no, title), end='', flush=True)
         if self.writer.contains_book(book_no):
             print(' -> contained and skip')
             return
@@ -146,7 +154,7 @@ class Books():
         """fetch_mont
         """
         print('{0} [INFO] Processing Top100 of {1}/{2:00}'.format(
-            datetime.datetime.now().isoformat(), year, month))
+            datetime_iso(), year, month))
         self.sleep()
         url = MONTHTOPB.format(year, month)
         soup = BeautifulSoup(urlopen(url), PARSER)
