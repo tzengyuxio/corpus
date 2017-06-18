@@ -30,6 +30,14 @@ CREATE TABLE IF NOT EXISTS
     books (book_no TEXT, title TEXT, author TEXT, page_count INTEGER, cont TEXT,
     PRIMARY KEY(book_no))
 '''
+# num_char:   number of character in raw_text except space and new-line
+# num_hanzi:  number of hanzi in raw_text
+# num_unique: number of unique hanze in raw_text
+SQL_CREATE_CORPUS = '''
+CREATE TABLE IF NOT EXISTS
+    corpus (src TEXT, idx TEXT, raw_text TEXT, stats TEXT, num_char INTEGER, num_hanzi INTEGER, num_unique INTEGER,
+    PRIMARY KEY(src, idx))
+'''
 SQL_INSERT_BOOK_TOPS = '''
 INSERT OR IGNORE INTO book_tops VALUES (?, ?, ?, ?, ?, ?)
 '''
@@ -38,6 +46,9 @@ INSERT OR IGNORE INTO books VALUES (?, ?, ?, ?, ?)
 '''
 SQL_EXISTS_BOOKS = '''
 SELECT 1 FROM books WHERE book_no=?
+'''
+SQL_SELECT_BOOKS = '''
+SELECT * FROM books WHERE page_count > 0
 '''
 
 
@@ -56,6 +67,7 @@ class SqliteWriter():
         cur = self.conn.cursor()
         cur.execute(SQL_CREATE_BOOK_TOPS)
         cur.execute(SQL_CREATE_BOOKS)
+        cur.execute(SQL_CREATE_CORPUS)
         self.conn.commit()
         cur.close()
 
@@ -87,6 +99,14 @@ class SqliteWriter():
         cur.close()
         return result
 
+    def select_book(self):
+        """select_book
+        """
+        cur = self.conn.cursor()
+        for row in cur.execute(SQL_SELECT_BOOKS):
+            print('{0} [INFO] Calc book[{1}]'.format(datetime_iso(), row[0]))
+        cur.close()
+
 
 class Books():
     """Crawler of Books.com
@@ -102,8 +122,12 @@ class Books():
         """sleep
         """
         self.urlopen_count += 1
-        if self.urlopen_count % 10 == 0:
-            for _ in range(12):
+        if self.urlopen_count % 100 == 0:
+            for _ in range(0, randint(24, 96), 2):
+                print('=', end='', flush=True)
+                sleep(2)
+        elif self.urlopen_count % 10 == 0:
+            for _ in range(randint(12, 20)):
                 print('-', end='', flush=True)
                 sleep(1)
         else:
@@ -179,20 +203,29 @@ class Books():
             for month in range(start_month, end_month):
                 self.fetch_month(year, month)
 
+    def calc_all(self):
+        """calc_all
+        """
+        self.writer.select_book()
+
+    def calc_one(self):
+        """calc_one
+        """
+
 
 def print_usage():
     """Print Usage
     """
     print('usage: {0} command'.format(sys.argv[0]))
     print('')
-    print('    list    save text list')
+    print('    fetch   fetch ')
 
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         print_usage()
         sys.exit(0)
-    elif sys.argv[1] == 'list':
+    elif sys.argv[1] == 'fetch':
         WRITER = SqliteWriter()
         BOOK = Books(WRITER)
         BOOK.fetch_all()
@@ -200,3 +233,7 @@ if __name__ == '__main__':
         # print(BOOK.test_book('0010723234'))
         # print(BOOK.fetch_book('0010723234', '為了活下去：脫北女孩朴研美', '朴研美', 5))
         # BOOK.fetch_book('0010723234', '為了活下去：脫北女孩朴研美', '朴研美')
+    elif sys.argv[1] == 'calc':
+        WRITER = SqliteWriter()
+        BOOK = Books(WRITER)
+        BOOK.calc_all()
