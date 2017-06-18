@@ -48,8 +48,8 @@ INSERT OR IGNORE INTO corpus VALUES (?, ?, ?, ?, ?, ?, ?)
 SQL_EXISTS_ARTICLE = '''
 SELECT 1 FROM articles WHERE art_id=?
 '''
-SQL_SELECT_BOOKS = '''
-SELECT * FROM books WHERE page_count > 0
+SQL_SELECT_ARTICLES = '''
+SELECT art_id, full_title, cont FROM articles
 '''
 
 
@@ -132,14 +132,14 @@ class SqliteWriter():
         cur.close()
         return result
 
-    def select_book(self):
+    def select_articles(self):
         """select_book
         """
         cur = self.conn.cursor()
-        for row in cur.execute(SQL_SELECT_BOOKS):
-            src = 'books'
+        for row in cur.execute(SQL_SELECT_ARTICLES):
+            src = 'magcnyes'
             idx = row[0]
-            raw_text = '{0}\n\n{1}\n{2}'.format(row[1], row[2], row[4])
+            raw_text = '{0}\n\n{1}'.format(row[1], row[2])
             trimed_text = raw_text.replace(' ', '').replace('\n', '')
             num_char = len(trimed_text)
             char_freq_table = {}
@@ -156,7 +156,7 @@ class SqliteWriter():
             cur_ins = self.conn.cursor()
             cur_ins.execute(SQL_INSERT_CORPUS, (src, idx, raw_text,
                                                 stats, num_char, num_hanzi, num_unique))
-            print('{0} [INFO] Calc book[{1}] ... num(char/hanzi/unique) = {2}/{3}/{4}'.format(
+            print('{0} [INFO] Calc article[{1}] ... num(char/hanzi/unique) = {2}/{3}/{4}'.format(
                 datetime_iso(), row[0], num_char, num_hanzi, num_unique))
             self.conn.commit()
             cur_ins.close()
@@ -263,7 +263,7 @@ class MagCnyes():
     def calc_all(self):
         """calc_all
         """
-        self.writer.select_book()
+        self.writer.select_articles()
 
     def calc_one(self):
         """calc_one
