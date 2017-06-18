@@ -2,6 +2,8 @@
 """Crawler of Books.com
 """
 
+import datetime
+import logging
 import sqlite3
 import sys
 from random import randint
@@ -87,6 +89,8 @@ class Books():
     def __init__(self, writer):
         self.writer = writer
         self.urlopen_count = 0
+        logging.basicConfig(
+            format='%(asctime)s %(levelname)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
     def sleep(self):
         """sleep
@@ -114,8 +118,8 @@ class Books():
     def fetch_book(self, book_no, title, author):
         """fetch_book
         """
-        print('[INFO]   Fetching Book[{0}] {1}'.format(
-            book_no, title), end='', flush=True)
+        print('{0} [INFO]   Fetching Book[{1}] {2}'.format(
+            datetime.datetime.now().isoformat(), book_no, title), end='', flush=True)
         if self.writer.contains_book(book_no):
             print(' -> contained and skip')
             return
@@ -124,7 +128,8 @@ class Books():
             self.writer.write_book(book_no, title, author, page_count, '')
             print(' -> no preview')
             return
-        text = '{0}\n\n{1}\n'.format(title, author)
+        # text = '{0}\n\n{1}\n'.format(title, author)
+        text = ''
         for i in range(1, page_count + 1):
             print('.', end='', flush=True)
             self.sleep()
@@ -140,7 +145,8 @@ class Books():
     def fetch_month(self, year, month):
         """fetch_mont
         """
-        print('[INFO] Processing Top100 of {0}/{1:00}'.format(year, month))
+        print('{0} [INFO] Processing Top100 of {1}/{2:00}'.format(
+            datetime.datetime.now().isoformat(), year, month))
         self.sleep()
         url = MONTHTOPB.format(year, month)
         soup = BeautifulSoup(urlopen(url), PARSER)
@@ -181,8 +187,8 @@ if __name__ == '__main__':
     elif sys.argv[1] == 'list':
         WRITER = SqliteWriter()
         BOOK = Books(WRITER)
-        # BOOK.fetch_all()
-        BOOK.fetch_month(2017, 4)
+        BOOK.fetch_all()
+        # BOOK.fetch_month(2017, 4)
         # print(BOOK.test_book('0010723234'))
         # print(BOOK.fetch_book('0010723234', '為了活下去：脫北女孩朴研美', '朴研美', 5))
         # BOOK.fetch_book('0010723234', '為了活下去：脫北女孩朴研美', '朴研美')
