@@ -171,7 +171,7 @@ class MagCnyes():
             url = urljoin(url_base, url_page)
             soup = BeautifulSoup(urlopen(url), PARSER)
             div_contents = soup.find_all('div', {'class': 'content'})
-            if div_contents is None:
+            if div_contents is None or len(div_contents) == 0:
                 print(' -> content broken')
                 return
             text += div_contents[0].text
