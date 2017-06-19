@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Crawler of Books.com
+"""Crawler of Mag Cnyes.com
 """
 
-import calendar
 import json
 import sqlite3
 import sys
-from datetime import datetime
 from random import randint
 from time import sleep
 from urllib.request import Request, urljoin, urlopen
 
 from bs4 import BeautifulSoup
+
+from utils import datetime_iso, is_unihan, month_range
 
 PARSER = 'html.parser'
 
@@ -51,41 +51,6 @@ SELECT 1 FROM articles WHERE art_id=?
 SQL_SELECT_ARTICLES = '''
 SELECT art_id, full_title, cont FROM articles
 '''
-
-
-def datetime_iso():
-    """datetime_iso
-    """
-    return datetime.now().replace(microsecond=0).isoformat(' ')
-
-
-def is_unihan(char):
-    """check a char is hanzi or not
-    """
-    return ('\u4e00' <= char <= '\u9fff' or
-            is_unihan_ext(char))
-
-
-def is_unihan_ext(char):
-    """
-    CJK Unified Ideographs Extension A: '\U00003400' <= char <= '\U00004dbf'
-    CJK Unified Ideographs Extension B: '\U00020000' <= char <= '\U0002a6df'
-    CJK Unified Ideographs Extension C: '\U0002a700' <= char <= '\U0002b73f'
-    CJK Unified Ideographs Extension D: '\U0002b740' <= char <= '\U0002b81f'
-    CJK Unified Ideographs Extension E: '\U0002b820' <= char <= '\U0002ceaf'
-    """
-    return ('\u3400' <= char <= '\u4dbf' or  # CJK Unified Ideographs Extension A
-            '\U00020000' <= char <= '\U0002a6df' or  # CJK Unified Ideographs Extension B
-            '\U0002a700' <= char <= '\U0002ceaf')  # CJK Unified Ideographs Extension C,D,E
-
-
-def month_range(year, month):
-    """month_range
-    """
-    first, last = calendar.monthrange(year, month)
-    first_date = '{0:04}-{1:02}-{2:02}'.format(year, month, first)
-    last_date = '{0:04}-{1:02}-{2:02}'.format(year, month, last)
-    return first_date, last_date
 
 
 class SqliteWriter():
