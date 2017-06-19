@@ -170,7 +170,11 @@ class MagCnyes():
             # self.sleep()
             url = urljoin(url_base, url_page)
             soup = BeautifulSoup(urlopen(url), PARSER)
-            text += soup.find_all('div', {'class': 'content'})[0].text
+            div_contents = soup.find_all('div', {'class': 'content'})
+            if div_contents is None:
+                print(' -> content broken')
+                return
+            text += div_contents[0].text
             bnext_btns = soup.find_all('a', {'class': 'bnext'})
             url_page = None if len(
                 bnext_btns) == 0 else bnext_btns[0].get('href')
