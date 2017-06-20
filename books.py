@@ -173,6 +173,24 @@ class Books():
         except HTTPError:
             return 0
 
+    def book_info(self, book_no):
+        """book_info
+        """
+        self.sleep()
+        url = PRODUCT.format(book_no)
+        soup = BeautifulSoup(urlopen(url), PARSER)
+        more = soup.find('p', {'class': 'more'})
+        contains = False if more is None else True
+        list_item = soup.find('li', {'itemprop': 'author'})
+        date = '1970-01-01'
+        while list_item is not None:
+            if u'出版日期' in list_item.text:
+                date = list_item.text[5:].replace('/', '-')
+                break
+            else:
+                list_item = list_item.find_next_sibling('li')
+        return contains, date
+
     def fetch_book(self, book_no, title, author):
         """fetch_book
         """
@@ -263,3 +281,10 @@ if __name__ == '__main__':
         WRITER = SqliteWriter()
         BOOK = Books(WRITER)
         BOOK.calc_all()
+    elif sys.argv[1] == 'date':
+        WRITER = SqliteWriter()
+        BOOK = Books(WRITER)
+        # CONTAINS, DATE = BOOK.book_info('0010592120')
+        # CONTAINS, DATE = BOOK.book_info('0010592301')
+        # print(CONTAINS)
+        # print(DATE)
