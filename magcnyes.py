@@ -49,7 +49,7 @@ SQL_EXISTS_ARTICLE = '''
 SELECT 1 FROM articles WHERE art_id=?
 '''
 SQL_SELECT_ARTICLES = '''
-SELECT art_id, full_title, cont FROM articles
+SELECT art_id, full_title, cont FROM articles WHERE substr(published, 0, 5)="2016"
 '''
 
 
