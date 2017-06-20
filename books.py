@@ -137,7 +137,8 @@ class SqliteWriter():
         """insert_published
         """
         cur = self.conn.cursor()
-        result = [(row[0], row[1]) for row in cur.execute('SELECT book_no, published FROM books')]
+        result = [(row[0], row[1]) for row in cur.execute(
+            'SELECT book_no, published FROM books')]
         cur.close()
         return result
 
@@ -195,18 +196,21 @@ class Books():
         """
         self.sleep()
         url = PRODUCT.format(book_no)
-        soup = BeautifulSoup(urlopen(url), PARSER)
-        more = soup.find('p', {'class': 'more'})
-        preview = False if more is None else True
-        list_item = soup.find('li', {'itemprop': 'author'})
         published = '1970-01-01'
-        while list_item is not None:
-            if u'出版日期' in list_item.text:
-                published = list_item.text[5:].replace('/', '-')
-                break
-            else:
-                list_item = list_item.find_next_sibling('li')
-        return preview, published
+        try:
+            soup = BeautifulSoup(urlopen(url), PARSER)
+            more = soup.find('p', {'class': 'more'})
+            preview = False if more is None else True
+            list_item = soup.find('li', {'itemprop': 'author'})
+            while list_item is not None:
+                if u'出版日期' in list_item.text:
+                    published = list_item.text[5:].replace('/', '-')
+                    break
+                else:
+                    list_item = list_item.find_next_sibling('li')
+            return preview, published
+        except HTTPError:
+            return False, published
 
     def fetch_book(self, book_no, title, author):
         """fetch_book
