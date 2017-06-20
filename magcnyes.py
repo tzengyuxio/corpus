@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS
 '''
 SQL_CREATE_MAGCNYES_ARTICLES = '''
 CREATE TABLE IF NOT EXISTS
-    articles (art_id TEXT, col_id INTEGER, col_name TEXT, title TEXT, full_title TEXT, mag_name TEXT, url TEXT, cont TEXT,
+    articles (art_id TEXT, col_id INTEGER, col_name TEXT, title TEXT, full_title TEXT, mag_name TEXT, published TEXT, url TEXT, cont TEXT,
     PRIMARY KEY(art_id))
 '''
 # num_char:   number of character in raw_text except space and new-line
@@ -40,7 +40,7 @@ SQL_INSERT_MAGCNYES_RANKINGS = '''
 INSERT OR IGNORE INTO rankings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 '''
 SQL_INSERT_MAGCNYES_ARTICLES = '''
-INSERT OR IGNORE INTO articles VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+INSERT OR IGNORE INTO articles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 '''
 SQL_INSERT_CORPUS = '''
 INSERT OR IGNORE INTO corpus VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -127,6 +127,20 @@ class SqliteWriter():
             cur_ins.close()
         cur.close()
 
+    def update_published(self):
+        """update_published
+        """
+        cur = self.conn.cursor()
+        for row in cur.execute('SELECT art_id, url FROM articles'):
+            art_id = row[0]
+            url = row[1]
+            published = '{0}-{1}-{2}'.format(url[9:13], url[13:15], url[15:17])
+            cur_up = self.conn.cursor()
+            cur_up.execute('UPDATE articles SET published=? WHERE art_id=?', (published, art_id))
+            self.conn.commit()
+            cur_up.close()
+        cur.close()
+
 
 class MagCnyes():
     """Crawler of MagCnyes
@@ -182,8 +196,11 @@ class MagCnyes():
         self.sleep()
 
         # write
+        published = '{0}-{1}-{2}'.format(
+            url_first[9:13], url_first[13:15], url_first[15:17])
         self.writer.write_article(
-            [art_id, col_id, self.columns[col_id], title, full_title, mag_name, url_first, text])
+            [art_id, col_id, self.columns[col_id], title, full_title, mag_name, published,
+             url_first, text])
         print('saved')
         return
 
@@ -238,6 +255,11 @@ class MagCnyes():
         """calc_one
         """
 
+    def update_published(self):
+        """update_published
+        """
+        self.writer.update_published()
+
 
 def print_usage():
     """Print Usage
@@ -263,3 +285,7 @@ if __name__ == '__main__':
         WRITER = SqliteWriter()
         MAG = MagCnyes(WRITER)
         MAG.calc_all()
+    elif sys.argv[1] == 'date':
+        WRITER = SqliteWriter()
+        MAG = MagCnyes(WRITER)
+        MAG.update_published()
