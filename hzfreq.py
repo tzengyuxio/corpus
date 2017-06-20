@@ -27,6 +27,11 @@ def report_summary():
     all_hanzi_count = sum(all_hanzi_freq_table.values())
     print("char size:", all_hanzi_count)
     print("uniq size:", len(all_hanzi_freq_table))
+    cur.close()
+
+    cur = conn.cursor()
+    for row in cur.execute('SELECT src, COUNT(*), SUM(num_hanzi) FROM corpus GROUP BY src'):
+        print('{0:>10} | {1:>7,} | {2:>12,}'.format(row[0], row[1], row[2]))
 
     # save all_hanzi_freq_table
     accum_count = 0
