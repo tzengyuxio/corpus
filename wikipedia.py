@@ -240,7 +240,7 @@ class Wikipedia():
     def calc_all(self):
         """calc_all
         """
-        self.writer.select_book()
+        self.writer.select_articles()
 
     def calc_one(self):
         """calc_one
