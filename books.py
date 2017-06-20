@@ -137,7 +137,7 @@ class SqliteWriter():
         """insert_published
         """
         cur = self.conn.cursor()
-        result = [row[0] for row in cur.execute('SELECT book_no FROM books')]
+        result = [(row[0], row[1]) for row in cur.execute('SELECT book_no, published FROM books')]
         cur.close()
         return result
 
@@ -278,10 +278,14 @@ class Books():
     def insert_published(self):
         """insert_published
         """
-        for book_no in self.writer.book_no_list():
+        for book_no, published in self.writer.book_no_list():
+            print('{0} [INFO] Writing book[{1}]...'.format(
+                datetime_iso(), book_no), end='', flush=True)
+            if published is not None:
+                print('"{0}" -> skipped.'.format(published))
+                continue
             _, published = self.book_info(book_no)
-            print('{0} [INFO] Writing published date "{1}" to book[{2}]'.format(
-                datetime_iso(), published, book_no))
+            print('with published date: "{0}"'.format(published))
             self.writer.update_published(book_no, published)
 
 
