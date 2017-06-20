@@ -110,7 +110,7 @@ class SqliteWriter():
         for row in cur.execute(SQL_SELECT_BOOKS):
             src = 'books'
             idx = row[0]
-            raw_text = '{0}\n\n{1}\n{2}'.format(row[1], row[2], row[4])
+            raw_text = '{0}\n\n{1}\n{2}'.format(row[1], row[2], row[5])
             trimed_text = raw_text.replace(' ', '').replace('\n', '')
             num_char = len(trimed_text)
             char_freq_table = {}
