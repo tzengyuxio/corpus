@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS
 '''
 SQL_CREATE_BOOKS = '''
 CREATE TABLE IF NOT EXISTS
-    books (book_no TEXT, title TEXT, author TEXT, page_count INTEGER, cont TEXT,
+    books (book_no TEXT, title TEXT, author TEXT, page_count INTEGER, published TEXT, cont TEXT,
     PRIMARY KEY(book_no))
 '''
 # num_char:   number of character in raw_text except space and new-line
@@ -44,7 +44,7 @@ SQL_INSERT_BOOK_TOPS = '''
 INSERT OR IGNORE INTO book_tops VALUES (?, ?, ?, ?, ?, ?)
 '''
 SQL_INSERT_BOOKS = '''
-INSERT OR IGNORE INTO books VALUES (?, ?, ?, ?, ?)
+INSERT OR IGNORE INTO books VALUES (?, ?, ?, ?, ?, ?)
 '''
 SQL_INSERT_CORPUS = '''
 INSERT OR IGNORE INTO corpus VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -84,12 +84,12 @@ class SqliteWriter():
         self.conn.commit()
         cur.close()
 
-    def write_book(self, book_no, title, author, page_count, cont):
+    def write_book(self, book_no, title, author, page_count, published, cont):
         """write_book
         """
         cur = self.conn.cursor()
         cur.execute(SQL_INSERT_BOOKS,
-                    (book_no, title, author, page_count, cont))
+                    (book_no, title, author, page_count, published, cont))
         self.conn.commit()
         cur.close()
 
@@ -131,6 +131,23 @@ class SqliteWriter():
                 datetime_iso(), row[0], num_char, num_hanzi, num_unique))
             self.corpus.commit()
             cur_ins.close()
+        cur.close()
+
+    def book_no_list(self):
+        """insert_published
+        """
+        cur = self.conn.cursor()
+        result = [row[0] for row in cur.execute('SELECT book_no FROM books')]
+        cur.close()
+        return result
+
+    def update_published(self, book_no, published):
+        """update_published
+        """
+        cur = self.conn.cursor()
+        cur.execute('UPDATE books SET published=? WHERE book_no=?',
+                    (published, book_no))
+        self.conn.commit()
         cur.close()
 
 
@@ -180,16 +197,16 @@ class Books():
         url = PRODUCT.format(book_no)
         soup = BeautifulSoup(urlopen(url), PARSER)
         more = soup.find('p', {'class': 'more'})
-        contains = False if more is None else True
+        preview = False if more is None else True
         list_item = soup.find('li', {'itemprop': 'author'})
-        date = '1970-01-01'
+        published = '1970-01-01'
         while list_item is not None:
             if u'出版日期' in list_item.text:
-                date = list_item.text[5:].replace('/', '-')
+                published = list_item.text[5:].replace('/', '-')
                 break
             else:
                 list_item = list_item.find_next_sibling('li')
-        return contains, date
+        return preview, published
 
     def fetch_book(self, book_no, title, author):
         """fetch_book
@@ -199,11 +216,12 @@ class Books():
         if self.writer.contains_book(book_no):
             print(' -> contained and skip')
             return
-        page_count = self.test_book(book_no)
-        if page_count <= 0:
-            self.writer.write_book(book_no, title, author, page_count, '')
+        preview, published = self.book_info(book_no)
+        if not preview:
+            self.writer.write_book(book_no, title, author, 0, published, '')
             print(' -> no preview')
             return
+        page_count = self.test_book(book_no)
         # text = '{0}\n\n{1}\n'.format(title, author)
         text = ''
         for i in range(1, page_count + 1):
@@ -214,7 +232,8 @@ class Books():
             cont = soup.find_all('div', {'class': 'cont'})[-1].text
             text += cont
             soup.decompose()
-        self.writer.write_book(book_no, title, author, page_count, text)
+        self.writer.write_book(book_no, title, author,
+                               page_count, published, text)
         print('saved')
         return
 
@@ -256,6 +275,15 @@ class Books():
         """calc_one
         """
 
+    def insert_published(self):
+        """insert_published
+        """
+        for book_no in self.writer.book_no_list():
+            _, published = self.book_info(book_no)
+            print('{0} [INFO] Writing published date "{1}" to book[{2}]'.format(
+                datetime_iso(), published, book_no))
+            self.writer.update_published(book_no, published)
+
 
 def print_usage():
     """Print Usage
@@ -284,6 +312,7 @@ if __name__ == '__main__':
     elif sys.argv[1] == 'date':
         WRITER = SqliteWriter()
         BOOK = Books(WRITER)
+        BOOK.insert_published()
         # CONTAINS, DATE = BOOK.book_info('0010592120')
         # CONTAINS, DATE = BOOK.book_info('0010592301')
         # print(CONTAINS)
