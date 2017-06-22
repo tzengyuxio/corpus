@@ -143,11 +143,15 @@ class News():
             links = json.loads(row[1])
             for link in links:
                 if self.has_link(link):
-                    print('[INFO] already fetched link; {0} '.format(link))
+                    print('{0} [INFO] already fetched link; {1} '.format(datetime_iso(), link))
                     continue
                 self.sleep()
-                print('[INFO] fetching...{0}'.format(link), end='', flush=True)
-                soup = BeautifulSoup(urlopen(link), PARSER)
+                print('{0} [INFO] fetching...{1} '.format(datetime_iso(), link), end='', flush=True)
+                resp = urlopen(link)
+                if resp.getcode() != 200:
+                    print('-> ERROR, code={0}'.format(resp.getcode))
+                    continue
+                soup = BeautifulSoup(resp, PARSER)
                 url = link
                 title = soup.find('header').text
                 art = soup.find('article').text
