@@ -175,6 +175,9 @@ class News():
                 except HTTPError:
                     print('-> ERROR')
                     continue
+                except KeyError(), e:
+                    print('-> KeyError: {0}'.format(e))
+                    continue
 
 
 def print_usage():
