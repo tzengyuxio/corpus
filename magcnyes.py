@@ -117,7 +117,7 @@ class SqliteWriter():
                                v in char_freq_table.items() if is_unihan(k)}
             num_hanzi = sum(char_freq_table.values())
             num_unique = len(char_freq_table)
-            stats = json.dumps(char_freq_table, sort_keys=True)
+            stats = json.dumps(char_freq_table, ensure_ascii=False, sort_keys=True).encode('utf-8')
             cur_ins = self.corpus.cursor()
             cur_ins.execute(SQL_INSERT_CORPUS, (src, idx, raw_text,
                                                 stats, num_char, num_hanzi, num_unique))
