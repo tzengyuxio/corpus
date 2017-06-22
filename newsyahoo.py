@@ -143,34 +143,37 @@ class News():
             links = json.loads(row[1])
             for link in links:
                 if self.has_link(link):
-                    print('{0} [INFO] already fetched link; {1} '.format(datetime_iso(), link))
+                    print('{0} [INFO] already fetched link; {1} '.format(
+                        datetime_iso(), link))
                     continue
                 self.sleep()
-                print('{0} [INFO] fetching...{1} '.format(datetime_iso(), link), end='', flush=True)
-                resp = urlopen(link)
-                if resp.getcode() != 200:
-                    print('-> ERROR, code={0}'.format(resp.getcode))
+                print('{0} [INFO] fetching...{1} '.format(
+                    datetime_iso(), link), end='', flush=True)
+                try:
+                    soup = BeautifulSoup(urlopen(link), PARSER)
+                    url = link
+                    title = soup.find('header').text
+                    art = soup.find('article').text
+                    uuid = soup.find('article')['data-uuid']
+                    date = soup.find('time')['datetime'][:10]
+                    provider_elem = soup.find(
+                        'span', {'class': 'provider-link'})
+                    author_elem = soup.find('div', {'class': 'author'})
+                    author = ""
+                    if author_elem != None:
+                        author = author_elem.text
+                    elif provider_elem != None:
+                        author = provider_elem.text
+                    print('-> {2} | {1}: {0}'.format(title, author, date))
+                    cur_art = self.conn.cursor()
+                    cur_art.execute(SQL_INSERT_ARTICLES,
+                                    (uuid, title, author, date, url, art))
+                    self.conn.commit()
+                    cur_art.close()
+                    soup.decompose()
+                except HTTPError:
+                    print('-> ERROR')
                     continue
-                soup = BeautifulSoup(resp, PARSER)
-                url = link
-                title = soup.find('header').text
-                art = soup.find('article').text
-                uuid = soup.find('article')['data-uuid']
-                date = soup.find('time')['datetime'][:10]
-                provider_elem = soup.find('span', {'class': 'provider-link'})
-                author_elem = soup.find('div', {'class': 'author'})
-                author = ""
-                if author_elem != None:
-                    author = author_elem.text
-                elif provider_elem != None:
-                    author = provider_elem.text
-                print('-> {2} | {1}: {0}'.format(title, author, date))
-                cur_art = self.conn.cursor()
-                cur_art.execute(SQL_INSERT_ARTICLES,
-                                (uuid, title, author, date, url, art))
-                self.conn.commit()
-                cur_art.close()
-                soup.decompose()
 
 
 def print_usage():
