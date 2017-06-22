@@ -23,9 +23,9 @@ CREATE TABLE IF NOT EXISTS
     today_picks (id TEXT, title TEXT, url TEXT, links TEXT,
     PRIMARY KEY(id))
 '''
-SQL_CREATE_NEWS_DAILY_PICKS = '''
+SQL_CREATE_NEWS_ARTICLES = '''
 CREATE TABLE IF NOT EXISTS
-    daily_picks(id TEXT, title TEXT, url TEXT,
+    articles(id TEXT, title TEXT, provider TEXT, published TEXT, url TEXT, cont TEXT,
     PRIMARY KEY(id))
 '''
 SQL_INSERT_NEWS_TODAY_PICKS = '''
@@ -33,6 +33,9 @@ INSERT OR IGNORE INTO today_picks (id, title, url) VALUES (?, ?, ?)
 '''
 SQL_UPDATE_NEWS_TODAY_PICKS = '''
 UPDATE today_picks SET links=? WHERE id=?
+'''
+SQL_INSERT_ARTICLES = '''
+INSERT OR IGNORE INTO articles (id, title, provider, published, url, cont) VALUES (?, ?, ?, ?, ?, ?)
 '''
 SQL_SELECT_NEWS_TODAY_PICKS = '''
 SELECT * FROM today_picks
@@ -70,6 +73,7 @@ class News():
         self.conn = sqlite3.connect('newsyahoo.db')
         cur = self.conn.cursor()
         cur.execute(SQL_CREATE_NEWS_TODAY_PICKS)
+        cur.execute(SQL_CREATE_NEWS_ARTICLES)
         self.conn.commit()
         cur.close()
 
@@ -100,8 +104,8 @@ class News():
                     cur.close()
                 start += len(data)
 
-    def fetch_articles(self):
-        """fetch_articles
+    def fetch_picks(self):
+        """fetch_picks
         """
         cur = self.conn.cursor()
         for row in cur.execute(SQL_SELECT_NEWS_TODAY_PICKS):
@@ -121,6 +125,49 @@ class News():
             cur_daily.close()
             soup.decompose()
 
+    def has_link(self, link):
+        """has_link
+        """
+        cur = self.conn.cursor()
+        cur.execute('SELECT 1 FROM articles WHERE url=?', [link])
+        self.conn.commit()
+        result = True if cur.fetchone() is not None else False
+        cur.close()
+        return result
+
+    def fetch_articles(self):
+        """fetch_articles
+        """
+        cur = self.conn.cursor()
+        for row in cur.execute('SELECT id, links FROM today_picks'):
+            links = json.loads(row[1])
+            for link in links:
+                if self.has_link(link):
+                    print('[INFO] already fetched link; {0} '.format(link))
+                    continue
+                self.sleep()
+                print('[INFO] fetching...{0}'.format(link), end='', flush=True)
+                soup = BeautifulSoup(urlopen(link), PARSER)
+                url = link
+                title = soup.find('header').text
+                art = soup.find('article').text
+                uuid = soup.find('article')['data-uuid']
+                date = soup.find('time')['datetime'][:10]
+                provider_elem = soup.find('span', {'class': 'provider-link'})
+                author_elem = soup.find('div', {'class': 'author'})
+                author = ""
+                if author_elem != None:
+                    author = author_elem.text
+                elif provider_elem != None:
+                    author = provider_elem.text
+                print('-> {2} | {1}: {0}'.format(title, author, date))
+                cur_art = self.conn.cursor()
+                cur_art.execute(SQL_INSERT_ARTICLES,
+                                (uuid, title, author, date, url, art))
+                self.conn.commit()
+                cur_art.close()
+                soup.decompose()
+
 
 def print_usage():
     """Print Usage
@@ -137,6 +184,7 @@ if __name__ == '__main__':
     elif sys.argv[1] == 'list':
         NEWS = News()
         NEWS.fetch_list()
+        NEWS.fetch_picks()
     elif sys.argv[1] == 'fetch':
         NEWS = News()
         NEWS.fetch_articles()
