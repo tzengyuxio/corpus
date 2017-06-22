@@ -178,6 +178,9 @@ class News():
                 except KeyError as e:
                     print('-> KeyError: {0}'.format(e))
                     continue
+                except AttributeError as e:
+                    print('-> AttributeError: {0}'.format(e))
+                    continue
 
 
 def print_usage():
