@@ -11,6 +11,7 @@ from time import sleep
 from urllib.request import Request, urljoin, urlopen
 from bs4 import BeautifulSoup
 from utils import datetime_iso, is_unihan, month_range
+from urllib.error import HTTPError
 
 PARSER = 'html.parser'
 YAHOO_TODAY = 'https://tw.news.yahoo.com/topic/yahoo-today'
