@@ -41,6 +41,9 @@ INSERT OR IGNORE INTO articles (id, title, provider, published, url, cont) VALUE
 SQL_SELECT_NEWS_TODAY_PICKS = '''
 SELECT * FROM today_picks
 '''
+SQL_INSERT_CORPUS = '''
+INSERT OR IGNORE INTO corpus VALUES (?, ?, ?, ?, ?, ?, ?)
+'''
 
 
 class News():
@@ -77,6 +80,8 @@ class News():
         cur.execute(SQL_CREATE_NEWS_ARTICLES)
         self.conn.commit()
         cur.close()
+
+        self.corpus = sqlite3.connect('corpus.db')
 
     def fetch_list(self):
         """fetch_list
@@ -182,6 +187,39 @@ class News():
                     print('-> AttributeError: {0}'.format(e))
                     continue
 
+    def calc_all(self):
+        """calc_all
+        """
+        # corpus (src TEXT, idx TEXT, raw_text TEXT, stats TEXT, num_char
+        # INTEGER, num_hanzi INTEGER, num_unique INTEGER,
+        cur = self.conn.cursor()
+        for row in cur.execute('SELECT * FROM articles'):
+            src = 'newsyahoo'
+            idx = row[0]
+            raw_text = '{0}\n{1}'.format(row[1], row[5])
+            trimed_text = raw_text.replace(' ', '').replace('\n', '')
+            num_char = len(trimed_text)
+            char_freq_table = {}
+            for char in trimed_text:
+                if char in char_freq_table:
+                    char_freq_table[char] += 1
+                else:
+                    char_freq_table[char] = 1
+            char_freq_table = {k: v for k,
+                                v in char_freq_table.items() if is_unihan(k)}
+            num_hanzi = sum(char_freq_table.values())
+            num_unique = len(char_freq_table)
+            stats = json.dumps(
+                char_freq_table, ensure_ascii=False, sort_keys=True).encode('utf-8')
+            cur_ins = self.corpus.cursor()
+            cur_ins.execute(SQL_INSERT_CORPUS, (src, idx, raw_text,
+                                                stats, num_char, num_hanzi, num_unique))
+            print('{0} [INFO] Calc news[{1}] ... num(char/hanzi/unique) = {2}/{3}/{4}'.format(
+                datetime_iso(), row[0], num_char, num_hanzi, num_unique))
+            cur_ins.close()
+        cur.close()
+        self.corpus.commit()
+
 
 def print_usage():
     """Print Usage
@@ -203,10 +241,8 @@ if __name__ == '__main__':
         NEWS = News()
         NEWS.fetch_articles()
     elif sys.argv[1] == 'calc':
-        pass
-        # WRITER = SqliteWriter()
-        # BOOK = Books(WRITER)
-        # BOOK.calc_all()
+        NEWS = News()
+        NEWS.calc_all()
     elif sys.argv[1] == 'date':
         pass
         # WRITER = SqliteWriter()

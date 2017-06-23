@@ -123,9 +123,9 @@ class SqliteWriter():
                                                 stats, num_char, num_hanzi, num_unique))
             print('{0} [INFO] Calc article[{1}] ... num(char/hanzi/unique) = {2}/{3}/{4}'.format(
                 datetime_iso(), row[0], num_char, num_hanzi, num_unique))
-            self.corpus.commit()
             cur_ins.close()
         cur.close()
+        self.corpus.commit()
 
     def update_published(self):
         """update_published
