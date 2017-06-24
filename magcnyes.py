@@ -169,7 +169,7 @@ class MagCnyesCrawler():
             print('(count: {0}, sleep {1} seconds) ['.format(
                 self.urlopen_count, seconds), end='')
             for _ in range(0, seconds, 2):
-                print('=', end='', flush=True)
+                print(':', end='', flush=True)
                 sleep(2)
             print(']')
         elif self.urlopen_count % 10 == 0:
@@ -177,7 +177,7 @@ class MagCnyesCrawler():
             print('(count: {0}, sleep {1} seconds) ['.format(
                 self.urlopen_count, seconds), end='')
             for _ in range(seconds):
-                print('-', end='', flush=True)
+                print('.', end='', flush=True)
                 sleep(1)
             print(']')
         else:
