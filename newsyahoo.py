@@ -101,7 +101,7 @@ class NewsYahooCrawler():
         self.urlopen_count += 1
         if self.urlopen_count % 3 == 0:
             sleep(randint(2, 4))
-        if self.urlopen_count % 100 == 0:
+        if self.urlopen_count % 20 == 0:
             seconds = 30
             print('(count: {0}, sleep {1} seconds) ['.format(
                 self.urlopen_count, seconds), end='')
