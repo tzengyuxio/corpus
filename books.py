@@ -156,7 +156,7 @@ class BooksCrawler():
         self.logger = logging.getLogger('books')
         self.logger.setLevel(logging.DEBUG)
         formatter = logging.Formatter(
-            '%(asctime)s %(levelname)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+            '%(asctime)s %(levelname)-7s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
         ifh = logging.FileHandler('crawler-books.log', encoding='utf-8')
         ifh.setFormatter(formatter)
@@ -177,15 +177,23 @@ class BooksCrawler():
         """
         self.urlopen_count += 1
         if self.urlopen_count % 100 == 0:
-            for _ in range(0, randint(24, 96), 2):
+            seconds = randint(24, 96)
+            print('(count: {0}, sleep {1} seconds) ['.format(
+                self.urlopen_count, seconds), end='')
+            for _ in range(0, seconds, 2):
                 print('=', end='', flush=True)
                 sleep(2)
+            print(']')
         elif self.urlopen_count % 10 == 0:
-            for _ in range(randint(12, 20)):
+            seconds = randint(12, 20)
+            print('(count: {0}, sleep {1} seconds) ['.format(
+                self.urlopen_count, seconds), end='')
+            for _ in range(seconds):
                 print('-', end='', flush=True)
                 sleep(1)
+            print(']')
         else:
-            sleep(randint(3, 5))
+            sleep(randint(2, 4))
 
     def contain_book(self, book_no):
         """check if contains book
@@ -217,6 +225,11 @@ class BooksCrawler():
         url = URL_PRODUCT.format(book_no)
         try:
             soup = BeautifulSoup(urlopen(url), PARSER)
+            meta = soup.find('meta', {'itemprop': 'productID'})
+            if meta is None:
+                return []
+            isbn = meta['content'][5:]
+
             list_item = soup.find('li', {'itemprop': 'author'})
             while list_item is not None:
                 li_text = list_item.text.strip()
@@ -225,8 +238,6 @@ class BooksCrawler():
                 elif u'出版日期' in li_text:
                     pub_date = li_text[5:].replace('/', '-')
                 list_item = list_item.find_next_sibling('li')
-            meta = soup.find('meta', {'itemprop': 'productID'})
-            isbn = meta['content'][5:]
             return [isbn, publisher, pub_date]
         except HTTPError:
             return []
@@ -351,4 +362,5 @@ if __name__ == '__main__':
         WRITER = SqliteWriter()
         CRAWLER = BooksCrawler(WRITER)
         # CRAWLER.crawl_book('0010743217', '房思琪的初戀樂園', '林奕含')
-        CRAWLER.crawl_month(2017, 5)
+        # CRAWLER.crawl_month(2017, 5)
+        CRAWLER.crawl_book('0010592444', '謎情柯洛斯III', '林奕含')
