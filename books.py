@@ -1,37 +1,52 @@
 #!/usr/bin/env python3
 """Crawler of Books.com
 """
-
 import json
 import logging
 import sqlite3
 import sys
-import time
 from random import randint
-from time import sleep
+from time import sleep, time
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
 from bs4 import BeautifulSoup
 
-from utils import datetime_iso, is_unihan
+from utils import PARSER, datetime_iso, is_unihan
 
-PARSER = 'html.parser'
+SQL_CREATE_TABLE_ARTICLES = '''
+CREATE TABLE IF NOT EXISTS articles (
+    book_no TEXT, isbn TEXT, author TEXT, publisher TEXT, pub_date TEXT, title TEXT, article TEXT,
+    PRIMARY KEY(book_no)
+)
+'''
+SQL_CREATE_TABLE_BOOKS = '''
+CREATE TABLE IF NOT EXISTS books (
+    book_no TEXT, page_cnt INTEGER,
+    PRIMARY KEY(book_no)
+)
+'''
+SQL_CONTAIN_BOOK = '''
+SELECT 1 FROM books WHERE book_no=?
+'''
+SQL_INSERT_ARTICLE = '''
+INSERT OR IGNORE INTO articles
+    (book_no, isbn, author, publisher, pub_date, title, article)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+'''
+SQL_INSERT_BOOK = '''
+INSERT OR IGNORE INTO books (book_no, page_cnt) VALUES (?, ?)
+'''
 
-MONTHTOPB = 'http://www.books.com.tw/web/sys_monthtopb/books/?year={0}&month={1}'
-PRODUCT = 'http://www.books.com.tw/products/{0}'
-SERIALTEXT = 'http://www.books.com.tw/web/sys_serialtext/?item={0}'
-SERIALTEXT_PAGE = SERIALTEXT + '&page={1}'
+URL_MONTHTOPB = 'http://www.books.com.tw/web/sys_monthtopb/books/?year={0}&month={1}'
+URL_PRODUCT = 'http://www.books.com.tw/products/{0}'
+URL_SERIALTEXT = 'http://www.books.com.tw/web/sys_serialtext/?item={0}'
+URL_SERIALTEXT_PAGE = URL_SERIALTEXT + '&page={1}'
 
 SQL_CREATE_BOOK_TOPS = '''
 CREATE TABLE IF NOT EXISTS
     book_tops (year INTEGER, month INTEGER, top INTEGER, book_no TEXT, title TEXT, author TEXT,
     PRIMARY KEY(year, month, top))
-'''
-SQL_CREATE_BOOKS = '''
-CREATE TABLE IF NOT EXISTS
-    books (book_no TEXT, title TEXT, author TEXT, page_count INTEGER, published TEXT, cont TEXT,
-    PRIMARY KEY(book_no))
 '''
 # num_char:   number of character in raw_text except space and new-line
 # num_hanzi:  number of hanzi in raw_text
@@ -44,14 +59,8 @@ CREATE TABLE IF NOT EXISTS
 SQL_INSERT_BOOK_TOPS = '''
 INSERT OR IGNORE INTO book_tops VALUES (?, ?, ?, ?, ?, ?)
 '''
-SQL_INSERT_BOOKS = '''
-INSERT OR IGNORE INTO books VALUES (?, ?, ?, ?, ?, ?)
-'''
 SQL_INSERT_CORPUS = '''
 INSERT OR IGNORE INTO corpus VALUES (?, ?, ?, ?, ?, ?, ?)
-'''
-SQL_EXISTS_BOOKS = '''
-SELECT 1 FROM books WHERE book_no=?
 '''
 SQL_SELECT_BOOKS = '''
 SELECT * FROM books WHERE page_count > 0
@@ -66,14 +75,8 @@ class SqliteWriter():
         self.conn = sqlite3.connect('books.db')
         cur = self.conn.cursor()
         cur.execute(SQL_CREATE_BOOK_TOPS)
-        cur.execute(SQL_CREATE_BOOKS)
+        cur.execute(SQL_CREATE_TABLE_ARTICLES)
         self.conn.commit()
-        cur.close()
-
-        self.corpus = sqlite3.connect('corpus.db')
-        cur = self.corpus.cursor()
-        cur.execute(SQL_CREATE_CORPUS)
-        self.corpus.commit()
         cur.close()
 
     def write_top(self, year, month, top_no, book_no, title, author):
@@ -84,25 +87,6 @@ class SqliteWriter():
                                            top_no, book_no, title, author))
         self.conn.commit()
         cur.close()
-
-    def write_book(self, book_no, title, author, page_count, published, cont):
-        """write_book
-        """
-        cur = self.conn.cursor()
-        cur.execute(SQL_INSERT_BOOKS,
-                    (book_no, title, author, page_count, published, cont))
-        self.conn.commit()
-        cur.close()
-
-    def contains_book(self, book_no):
-        """contains_book
-        """
-        cur = self.conn.cursor()
-        cur.execute(SQL_EXISTS_BOOKS, [book_no])
-        self.conn.commit()
-        result = True if cur.fetchone() is not None else False
-        cur.close()
-        return result
 
     def select_book(self):
         """select_book
@@ -124,15 +108,16 @@ class SqliteWriter():
                                v in char_freq_table.items() if is_unihan(k)}
             num_hanzi = sum(char_freq_table.values())
             num_unique = len(char_freq_table)
-            stats = json.dumps(char_freq_table, ensure_ascii=False, sort_keys=True).encode('utf-8')
-            cur_ins = self.corpus.cursor()
-            cur_ins.execute(SQL_INSERT_CORPUS, (src, idx, raw_text,
-                                                stats, num_char, num_hanzi, num_unique))
+            stats = json.dumps(
+                char_freq_table, ensure_ascii=False, sort_keys=True).encode('utf-8')
+            # cur_ins = self.corpus.cursor()
+            # cur_ins.execute(SQL_INSERT_CORPUS, (src, idx, raw_text,
+            # stats, num_char, num_hanzi, num_unique))
             print('{0} [INFO] Calc book[{1}] ... num(char/hanzi/unique) = {2}/{3}/{4}'.format(
                 datetime_iso(), row[0], num_char, num_hanzi, num_unique))
-            cur_ins.close()
+            # cur_ins.close()
         cur.close()
-        self.corpus.commit()
+        # self.corpus.commit()
 
     def book_no_list(self):
         """insert_published
@@ -153,15 +138,47 @@ class SqliteWriter():
         cur.close()
 
 
-class Books():
+class BooksCrawler():
     """Crawler of Books.com
     """
 
     def __init__(self, writer):
         self.writer = writer
         self.urlopen_count = 0
-        logging.basicConfig(
-            format='%(asctime)s %(levelname)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        self.init_db()
+        self.init_logger()
+
+    def init_db(self):
+        """init db
+        """
+        self.conn = sqlite3.connect('source-books.db')
+        cur = self.conn.cursor()
+        cur.execute(SQL_CREATE_TABLE_ARTICLES)
+        cur.execute(SQL_CREATE_TABLE_BOOKS)
+        self.conn.commit()
+        cur.close()
+
+    def init_logger(self):
+        """init logger
+        """
+        self.logger = logging.getLogger('books')
+        self.logger.setLevel(logging.DEBUG)
+        formatter = logging.Formatter(
+            '%(asctime)s %(levelname)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+        ifh = logging.FileHandler('crawler-books.log')
+        ifh.setFormatter(formatter)
+        ifh.setLevel(logging.INFO)
+        wfh = logging.FileHandler('crawler-books-warn.log')
+        wfh.setFormatter(formatter)
+        wfh.setLevel(logging.WARN)
+        dsh = logging.StreamHandler()
+        dsh.setFormatter(formatter)
+        dsh.setLevel(logging.DEBUG)
+
+        self.logger.addHandler(ifh)
+        self.logger.addHandler(wfh)
+        self.logger.addHandler(dsh)
 
     def sleep(self):
         """sleep
@@ -178,69 +195,100 @@ class Books():
         else:
             sleep(randint(3, 5))
 
-    def test_book(self, book_no):
-        """test_book
+    def contain_book(self, book_no):
+        """check if contains book
+        """
+        cur = self.conn.cursor()
+        cur.execute(SQL_CONTAIN_BOOK, [book_no])
+        result = True if cur.fetchone() is not None else False
+        cur.close()
+        return result
+
+    def get_page_count(self, book_no):
+        """get page count
         """
         self.sleep()
-        url = SERIALTEXT.format(book_no)
+        url = URL_SERIALTEXT.format(book_no)
         try:
             soup = BeautifulSoup(urlopen(url), PARSER)
-            page_count = int(soup.find_all(
-                'div', {'class': 'page'})[-1].span.text)
+            span = soup.find_all('div', {'class': 'page'})[-1].span
+            page_cnt = int(span.text)
             soup.decompose()
-            return page_count
+            return page_cnt
         except HTTPError:
             return 0
 
-    def book_info(self, book_no):
-        """book_info
+    def get_book_info(self, book_no):
+        """get book info
         """
         self.sleep()
-        url = PRODUCT.format(book_no)
-        published = '1970-01-01'
+        url = URL_PRODUCT.format(book_no)
         try:
             soup = BeautifulSoup(urlopen(url), PARSER)
-            more = soup.find('p', {'class': 'more'})
-            preview = False if more is None else True
             list_item = soup.find('li', {'itemprop': 'author'})
             while list_item is not None:
-                if u'出版日期' in list_item.text:
-                    published = list_item.text[5:].replace('/', '-')
-                    break
-                else:
-                    list_item = list_item.find_next_sibling('li')
-            return preview, published
+                li_text = list_item.text.strip()
+                if u'出版社' in li_text:
+                    publisher = list_item.find('a').text
+                elif u'出版日期' in li_text:
+                    pub_date = li_text[5:].replace('/', '-')
+                list_item = list_item.find_next_sibling('li')
+            meta = soup.find('meta', {'itemprop': 'productID'})
+            isbn = meta['content'][5:]
+            return [isbn, publisher, pub_date]
         except HTTPError:
-            return False, published
+            return []
 
-    def fetch_book(self, book_no, title, author):
-        """fetch_book
+    def insert_book(self, book_no, page_cnt):
+        """insert book
         """
-        print('{0} [INFO]   Fetching Book[{1}] {2}'.format(
-            datetime_iso(), book_no, title), end='', flush=True)
-        if self.writer.contains_book(book_no):
-            print(' -> contained and skip')
+        cur = self.conn.cursor()
+        cur.execute(SQL_INSERT_BOOK, (book_no, page_cnt))
+        self.conn.commit()
+        cur.close()
+
+    def insert_article(self, article_values):
+        """insert article
+        """
+        cur = self.conn.cursor()
+        cur.execute(SQL_INSERT_ARTICLE, article_values)
+        self.conn.commit()
+        cur.close()
+
+    def crawl_book(self, book_no, title, author):
+        """crawl book
+        return values list of book
+        """
+        self.logger.info('fetching book[%s]...', book_no)
+
+        if self.contain_book(book_no):
+            self.logger.info('      -> book[%s] contained and skip', book_no)
             return
-        preview, published = self.book_info(book_no)
-        if not preview:
-            self.writer.write_book(book_no, title, author, 0, published, '')
-            print(' -> no preview')
+        page_cnt = self.get_page_count(book_no)
+        if page_cnt <= 0:
+            self.logger.info('      -> book[%s] has no preview', book_no)
+            self.insert_book(book_no, page_cnt)
             return
-        page_count = self.test_book(book_no)
-        # text = '{0}\n\n{1}\n'.format(title, author)
-        text = ''
-        for i in range(1, page_count + 1):
-            print('.', end='', flush=True)
+        book_info = self.get_book_info(book_no)
+        if len(book_info) == 0:
+            self.logger.warning('      -> book[%s] cannot get info', book_no)
+            book_info = ['', '', '1970-01-01']
+
+        cont = ''
+        for i in range(1, page_cnt + 1):
             self.sleep()
-            url = SERIALTEXT_PAGE.format(book_no, i)
+            url = URL_SERIALTEXT_PAGE.format(book_no, i)
             soup = BeautifulSoup(urlopen(url), PARSER)
-            cont = soup.find_all('div', {'class': 'cont'})[-1].text
-            text += cont
+            text = soup.find_all('div', {'class': 'cont'})[-1].text
+            cont += text
             soup.decompose()
-        self.writer.write_book(book_no, title, author,
-                               page_count, published, text)
-        print('saved')
-        return
+
+        article_values = [book_no, book_info[0], author,
+                          book_info[1], book_info[2], title, cont]
+        self.insert_book(book_no, page_cnt)
+        self.insert_article(article_values)
+        self.logger.info(
+            '      -> book[%s] %s %d pages saved', book_no, title, page_cnt)
 
     def fetch_month(self, year, month):
         """fetch_mont
@@ -248,7 +296,7 @@ class Books():
         print('{0} [INFO] Processing Top100 of {1}-{2:02}'.format(
             datetime_iso(), year, month))
         self.sleep()
-        url = MONTHTOPB.format(year, month)
+        url = URL_MONTHTOPB.format(year, month)
         soup = BeautifulSoup(urlopen(url), PARSER)
         for div in soup.find_all('div', {'class': 'type02_bd-a'}):
             top_no = div.parent.find_all('strong', {'class': 'no'})[0].text
@@ -257,7 +305,7 @@ class Books():
             href = div.h4.a.get('href')
             book_no = href.rsplit('/', 1)[-1].split('?')[0]
             self.writer.write_top(year, month, top_no, book_no, title, author)
-            self.fetch_book(book_no, title, author)
+            self.crawl_book(book_no, title, author)
         soup.decompose()
 
     def fetch_all(self):
@@ -274,27 +322,14 @@ class Books():
     def calc_all(self):
         """calc_all
         """
-        t_start = time.time()
+        t_start = time()
         self.writer.select_book()
-        t_end = time.time()
+        t_end = time()
         print(t_end - t_start)
 
     def calc_one(self):
         """calc_one
         """
-
-    def insert_published(self):
-        """insert_published
-        """
-        for book_no, published in self.writer.book_no_list():
-            print('{0} [INFO] Writing book[{1}]...'.format(
-                datetime_iso(), book_no), end='', flush=True)
-            if published is not None:
-                print('"{0}" -> skipped.'.format(published))
-                continue
-            _, published = self.book_info(book_no)
-            print('with published date: "{0}"'.format(published))
-            self.writer.update_published(book_no, published)
 
 
 def print_usage():
@@ -311,21 +346,24 @@ if __name__ == '__main__':
         sys.exit(0)
     elif sys.argv[1] == 'fetch':
         WRITER = SqliteWriter()
-        BOOK = Books(WRITER)
-        BOOK.fetch_all()
+        CRAWLER = BooksCrawler(WRITER)
+        CRAWLER.fetch_all()
         # BOOK.fetch_month(2017, 4)
         # print(BOOK.test_book('0010723234'))
         # print(BOOK.fetch_book('0010723234', '為了活下去：脫北女孩朴研美', '朴研美', 5))
         # BOOK.fetch_book('0010723234', '為了活下去：脫北女孩朴研美', '朴研美')
     elif sys.argv[1] == 'calc':
         WRITER = SqliteWriter()
-        BOOK = Books(WRITER)
-        BOOK.calc_all()
+        CRAWLER = BooksCrawler(WRITER)
+        CRAWLER.calc_all()
     elif sys.argv[1] == 'date':
         WRITER = SqliteWriter()
-        BOOK = Books(WRITER)
-        BOOK.insert_published()
+        CRAWLER = BooksCrawler(WRITER)
         # CONTAINS, DATE = BOOK.book_info('0010592120')
         # CONTAINS, DATE = BOOK.book_info('0010592301')
         # print(CONTAINS)
         # print(DATE)
+    elif sys.argv[1] == 'test':
+        WRITER = SqliteWriter()
+        CRAWLER = BooksCrawler(WRITER)
+        CRAWLER.crawl_book('0010723234', 'Title', 'Author')
