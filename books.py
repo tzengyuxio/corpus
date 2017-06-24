@@ -26,16 +26,24 @@ CREATE TABLE IF NOT EXISTS books (
     PRIMARY KEY(book_no)
 )
 '''
+SQL_CREATE_TABLE_RANKINGS = '''
+CREATE TABLE IF NOT EXISTS rankings (
+    year INTEGER, month INTEGER, ranking INTEGER, book_no TEXT, title TEXT, author TEXT,
+    PRIMARY KEY(year, month, ranking)
+)
+'''
 SQL_CONTAIN_BOOK = '''
 SELECT 1 FROM books WHERE book_no=?
 '''
 SQL_INSERT_ARTICLE = '''
 INSERT OR IGNORE INTO articles
-    (book_no, isbn, author, publisher, pub_date, title, article)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    (book_no, isbn, author, publisher, pub_date, title, article) VALUES (?, ?, ?, ?, ?, ?, ?)
 '''
 SQL_INSERT_BOOK = '''
 INSERT OR IGNORE INTO books (book_no, page_cnt) VALUES (?, ?)
+'''
+SQL_INSERT_RANKING = '''
+INSERT OR IGNORE INTO rankings (year, month, ranking, book_no, title, author) VALUES (?, ?, ?, ?, ?, ?)
 '''
 
 URL_MONTHTOPB = 'http://www.books.com.tw/web/sys_monthtopb/books/?year={0}&month={1}'
@@ -43,11 +51,6 @@ URL_PRODUCT = 'http://www.books.com.tw/products/{0}'
 URL_SERIALTEXT = 'http://www.books.com.tw/web/sys_serialtext/?item={0}'
 URL_SERIALTEXT_PAGE = URL_SERIALTEXT + '&page={1}'
 
-SQL_CREATE_BOOK_TOPS = '''
-CREATE TABLE IF NOT EXISTS
-    book_tops (year INTEGER, month INTEGER, top INTEGER, book_no TEXT, title TEXT, author TEXT,
-    PRIMARY KEY(year, month, top))
-'''
 # num_char:   number of character in raw_text except space and new-line
 # num_hanzi:  number of hanzi in raw_text
 # num_unique: number of unique hanze in raw_text
@@ -55,9 +58,6 @@ SQL_CREATE_CORPUS = '''
 CREATE TABLE IF NOT EXISTS
     corpus (src TEXT, idx TEXT, raw_text TEXT, stats TEXT, num_char INTEGER, num_hanzi INTEGER, num_unique INTEGER,
     PRIMARY KEY(src, idx))
-'''
-SQL_INSERT_BOOK_TOPS = '''
-INSERT OR IGNORE INTO book_tops VALUES (?, ?, ?, ?, ?, ?)
 '''
 SQL_INSERT_CORPUS = '''
 INSERT OR IGNORE INTO corpus VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -74,17 +74,7 @@ class SqliteWriter():
     def __init__(self):
         self.conn = sqlite3.connect('books.db')
         cur = self.conn.cursor()
-        cur.execute(SQL_CREATE_BOOK_TOPS)
         cur.execute(SQL_CREATE_TABLE_ARTICLES)
-        self.conn.commit()
-        cur.close()
-
-    def write_top(self, year, month, top_no, book_no, title, author):
-        """write_ranking
-        """
-        cur = self.conn.cursor()
-        cur.execute(SQL_INSERT_BOOK_TOPS, (year, month,
-                                           top_no, book_no, title, author))
         self.conn.commit()
         cur.close()
 
@@ -147,6 +137,7 @@ class BooksCrawler():
         self.urlopen_count = 0
         self.init_db()
         self.init_logger()
+        self.logger.info('---- [BooksCrawler] ------------------------------')
 
     def init_db(self):
         """init db
@@ -155,6 +146,7 @@ class BooksCrawler():
         cur = self.conn.cursor()
         cur.execute(SQL_CREATE_TABLE_ARTICLES)
         cur.execute(SQL_CREATE_TABLE_BOOKS)
+        cur.execute(SQL_CREATE_TABLE_RANKINGS)
         self.conn.commit()
         cur.close()
 
@@ -166,10 +158,10 @@ class BooksCrawler():
         formatter = logging.Formatter(
             '%(asctime)s %(levelname)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
-        ifh = logging.FileHandler('crawler-books.log')
+        ifh = logging.FileHandler('crawler-books.log', encoding='utf-8')
         ifh.setFormatter(formatter)
         ifh.setLevel(logging.INFO)
-        wfh = logging.FileHandler('crawler-books-warn.log')
+        wfh = logging.FileHandler('crawler-books-warn.log', encoding='utf-8')
         wfh.setFormatter(formatter)
         wfh.setLevel(logging.WARN)
         dsh = logging.StreamHandler()
@@ -255,11 +247,19 @@ class BooksCrawler():
         self.conn.commit()
         cur.close()
 
+    def insert_ranking(self, ranking_values):
+        """insert ranking
+        """
+        cur = self.conn.cursor()
+        cur.execute(SQL_INSERT_RANKING, ranking_values)
+        self.conn.commit()
+        cur.close()
+
     def crawl_book(self, book_no, title, author):
         """crawl book
         return values list of book
         """
-        self.logger.info('fetching book[%s]...', book_no)
+        self.logger.info('fetching book[%s] %s...', book_no, title)
 
         if self.contain_book(book_no):
             self.logger.info('      -> book[%s] contained and skip', book_no)
@@ -290,21 +290,20 @@ class BooksCrawler():
         self.logger.info(
             '      -> book[%s] %s %d pages saved', book_no, title, page_cnt)
 
-    def fetch_month(self, year, month):
-        """fetch_mont
+    def crawl_month(self, year, month):
+        """crawl_month
         """
-        print('{0} [INFO] Processing Top100 of {1}-{2:02}'.format(
-            datetime_iso(), year, month))
+        self.logger.info('fetching TOP 100 of %4d-%02d...', year, month)
         self.sleep()
         url = URL_MONTHTOPB.format(year, month)
         soup = BeautifulSoup(urlopen(url), PARSER)
         for div in soup.find_all('div', {'class': 'type02_bd-a'}):
-            top_no = div.parent.find_all('strong', {'class': 'no'})[0].text
+            top_no = div.parent.find('strong', {'class': 'no'}).text
             title = div.h4.text
             author = div.ul.li.text[3:]
             href = div.h4.a.get('href')
             book_no = href.rsplit('/', 1)[-1].split('?')[0]
-            self.writer.write_top(year, month, top_no, book_no, title, author)
+            self.insert_ranking([year, month, top_no, book_no, title, author])
             self.crawl_book(book_no, title, author)
         soup.decompose()
 
@@ -317,7 +316,7 @@ class BooksCrawler():
             start_month = start[1] if year == start[0] else 1
             end_month = end[1] if year == end[0] else 13
             for month in range(start_month, end_month):
-                self.fetch_month(year, month)
+                self.crawl_month(year, month)
 
     def calc_all(self):
         """calc_all
@@ -326,10 +325,6 @@ class BooksCrawler():
         self.writer.select_book()
         t_end = time()
         print(t_end - t_start)
-
-    def calc_one(self):
-        """calc_one
-        """
 
 
 def print_usage():
@@ -344,26 +339,16 @@ if __name__ == '__main__':
     if len(sys.argv) < 2:
         print_usage()
         sys.exit(0)
-    elif sys.argv[1] == 'fetch':
+    elif sys.argv[1] == 'all':
         WRITER = SqliteWriter()
         CRAWLER = BooksCrawler(WRITER)
         CRAWLER.fetch_all()
-        # BOOK.fetch_month(2017, 4)
-        # print(BOOK.test_book('0010723234'))
-        # print(BOOK.fetch_book('0010723234', '為了活下去：脫北女孩朴研美', '朴研美', 5))
-        # BOOK.fetch_book('0010723234', '為了活下去：脫北女孩朴研美', '朴研美')
     elif sys.argv[1] == 'calc':
         WRITER = SqliteWriter()
         CRAWLER = BooksCrawler(WRITER)
         CRAWLER.calc_all()
-    elif sys.argv[1] == 'date':
-        WRITER = SqliteWriter()
-        CRAWLER = BooksCrawler(WRITER)
-        # CONTAINS, DATE = BOOK.book_info('0010592120')
-        # CONTAINS, DATE = BOOK.book_info('0010592301')
-        # print(CONTAINS)
-        # print(DATE)
     elif sys.argv[1] == 'test':
         WRITER = SqliteWriter()
         CRAWLER = BooksCrawler(WRITER)
-        CRAWLER.crawl_book('0010723234', 'Title', 'Author')
+        # CRAWLER.crawl_book('0010743217', '房思琪的初戀樂園', '林奕含')
+        CRAWLER.crawl_month(2017, 5)

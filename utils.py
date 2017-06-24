@@ -4,7 +4,7 @@
 from calendar import monthrange
 from datetime import datetime
 
-PARSER = 'html.parser'
+PARSER = 'lxml'  # 'html.parser'
 
 
 def datetime_iso():
