@@ -59,9 +59,6 @@ CREATE TABLE IF NOT EXISTS
     corpus (src TEXT, idx TEXT, raw_text TEXT, stats TEXT, num_char INTEGER, num_hanzi INTEGER, num_unique INTEGER,
     PRIMARY KEY(src, idx))
 '''
-SQL_INSERT_MAGCNYES_RANKINGS = '''
-INSERT OR IGNORE INTO rankings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-'''
 SQL_INSERT_CORPUS = '''
 INSERT OR IGNORE INTO corpus VALUES (?, ?, ?, ?, ?, ?, ?)
 '''
@@ -81,14 +78,6 @@ class SqliteWriter():
         # cur.execute(SQL_CREATE_MAGCNYES_ARTICLES)
         # self.conn.commit()
         # cur.close()
-
-    def write_ranking(self, values):
-        """write_ranking
-        """
-        cur = self.conn.cursor()
-        cur.execute(SQL_INSERT_MAGCNYES_RANKINGS, values)
-        self.conn.commit()
-        cur.close()
 
     def select_articles(self):
         """select_book
@@ -172,7 +161,7 @@ class MagCnyesCrawler():
         """sleep
         """
         self.urlopen_count += 1
-        if sec is not None:
+        if sec is not None and self.urlopen_count % 10 != 0:
             sleep(sec)
             return
         if self.urlopen_count % 100 == 0:
