@@ -184,6 +184,40 @@ class NewsYahooCrawler():
             summary.append(hrefs_json)
             self.insert_today_picks(summary)
 
+    def fetch_article(self, url):
+        """fetch_article
+        """
+        self.logger.info('fetching article(%s)...', url)
+        if self.contain_article(url):
+            self.logger.info('      -> already saved link: %s', url)
+            return
+        self.sleep()
+        try:
+            soup = BeautifulSoup(urlopen(url), PARSER)
+            title = soup.find('header').text
+            art = soup.find('article').text
+            uuid = soup.find('article')['data-uuid']
+            pub_date = soup.find('time')['datetime'][:10]
+            author_tag = soup.find('div', {'class': 'author'})
+            provdr_tag = soup.find('span', {'class': 'provider-link'})
+            author = author_tag.text if author_tag != None else ''
+            provider = provdr_tag.text if provdr_tag != None else ''
+            soup.decompose()
+            article_values = [uuid, author, provider,
+                              pub_date, url, title, art]
+            self.insert_article(article_values)
+            self.logger.info(
+                '      -> [%s] by "%s|%s" at %s', title, provider, author, pub_date)
+        except HTTPError as err:
+            self.logger.error(
+                '      -> article(%s) fetch fail: %s', url, err)
+        except KeyError as err:
+            self.logger.error(
+                '      -> article(%s) fetch fail: KeyError: %s', url, err)
+        except AttributeError as err:
+            self.logger.error(
+                '      -> article(%s) fetch fail: AttributeError: %s', url, err)
+
     def fetch_articles(self):
         """fetch_articles
         """
@@ -191,39 +225,7 @@ class NewsYahooCrawler():
         for row in cur.execute(SQL_SELECT_TODAY_PICKS):
             pick_links = json.loads(row[1])
             for url in pick_links:
-                self.logger.info('fetching article(%s)...', url)
-                if self.contain_article(url):
-                    self.logger.info('      -> already saved link: %s', url)
-                    continue
-                self.sleep()
-                try:
-                    soup = BeautifulSoup(urlopen(url), PARSER)
-                    title = soup.find('header').text
-                    art = soup.find('article').text
-                    uuid = soup.find('article')['data-uuid']
-                    pub_date = soup.find('time')['datetime'][:10]
-                    author_tag = soup.find('div', {'class': 'author'})
-                    provdr_tag = soup.find('span', {'class': 'provider-link'})
-                    author = author_tag.text if author_tag != None else ''
-                    provider = provdr_tag.text if provdr_tag != None else ''
-                    soup.decompose()
-                    article_values = [uuid, author, provider,
-                                      pub_date, url, title, art]
-                    self.insert_article(article_values)
-                    self.logger.info(
-                        '      -> [%s]by "%s/%s" at %s', title, provider, author, pub_date)
-                except HTTPError as err:
-                    self.logger.error(
-                        '      -> article(%s) fetch fail: %s', url, err)
-                    continue
-                except KeyError as err:
-                    self.logger.error(
-                        '      -> article(%s) fetch fail: KeyError: %s', url, err)
-                    continue
-                except AttributeError as err:
-                    self.logger.error(
-                        '      -> article(%s) fetch fail: AttributeError: %s', url, err)
-                    continue
+                self.fetch_article(url)
 
     def calc_all(self):
         """calc_all
