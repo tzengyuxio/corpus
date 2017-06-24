@@ -322,6 +322,10 @@ if __name__ == '__main__':
     if len(sys.argv) < 2:
         print_usage()
         sys.exit(0)
+    elif sys.argv[1] == 'all':
+        WRITER = SqliteWriter()
+        CRAWLER = MagCnyesCrawler(WRITER)
+        CRAWLER.fetch_all()
     elif sys.argv[1] == 'fetch':
         WRITER = SqliteWriter()
         MAG = MagCnyesCrawler(WRITER)
