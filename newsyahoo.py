@@ -46,19 +46,6 @@ URL_YAHOO_TODAY = 'https://tw.news.yahoo.com/topic/yahoo-today'
 URL_INDEXDATASERVICE_PATH = '/_td-news/api/resource/IndexDataService.getEditorialList;loadMore=true;count={0};start={1};mrs=%7B%22size%22%3A%7B%22w%22%3A220%2C%22h%22%3A128%7D%7D;uuid=f1d5a047-b405-4a6b-992b-f5298db387f5?'
 URL_INDEXDATASERVICE = URL_NEWS_YAHOO + URL_INDEXDATASERVICE_PATH
 
-
-SQL_INSERT_NEWS_TODAY_PICKS = '''
-INSERT OR IGNORE INTO today_picks (id, title, url) VALUES (?, ?, ?)
-'''
-SQL_UPDATE_NEWS_TODAY_PICKS = '''
-UPDATE today_picks SET links=? WHERE id=?
-'''
-SQL_INSERT_ARTICLES = '''
-INSERT OR IGNORE INTO articles (id, title, provider, published, url, cont) VALUES (?, ?, ?, ?, ?, ?)
-'''
-SQL_SELECT_NEWS_TODAY_PICKS = '''
-SELECT * FROM today_picks
-'''
 SQL_INSERT_CORPUS = '''
 INSERT OR IGNORE INTO corpus VALUES (?, ?, ?, ?, ?, ?, ?)
 '''
@@ -114,6 +101,14 @@ class NewsYahooCrawler():
         self.urlopen_count += 1
         if self.urlopen_count % 3 == 0:
             sleep(randint(2, 4))
+        if self.urlopen_count % 100 == 0:
+            seconds = 30
+            print('(count: {0}, sleep {1} seconds) ['.format(
+                self.urlopen_count, seconds), end='')
+            for _ in range(0, seconds, 2):
+                print(':', end='', flush=True)
+                sleep(2)
+            print(']')
 
     def contain_article(self, link):
         """contain_article
