@@ -62,6 +62,7 @@ def iri_to_uri(iri):
     parts = parse.urlsplit(iri)
     parts = list(parts)
     parts[2] = parse.quote(parts[2])
+    parts[3] = parse.quote(parts[3]) # this hack only work for appledaily
     return parse.urlunsplit(parts)
     # return parse.urlunparse(
     #     part.encode('idna') if parti == 1 else url_encode_non_ascii(

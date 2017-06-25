@@ -172,7 +172,8 @@ class AppleDailyCrawler():
 
         self.sleep(sec=0)
         #  (art_id, pub_date, category, section, title, subtitle, article)
-        soup = BeautifulSoup(urlopen(iri_to_uri(url)), PARSER)
+        uri = iri_to_uri(url)
+        soup = BeautifulSoup(urlopen(uri), PARSER)
         h1_tag = soup.find('h1', {'id': 'h1'})
         h2_tag = soup.find('h2', {'id': 'h2'})
         title = h1_tag.text if h1_tag is not None else ''
@@ -204,7 +205,7 @@ class AppleDailyCrawler():
         return (name, news_list)
 
     def fetch_day(self, the_day):
-        """fetch_day
+        """fetch_day of DB TABLE `dailies`
         """
         self.logger.info('fetching daily[%s]', the_day)
         str_day = the_day.strftime('%Y%m%d')
@@ -255,10 +256,10 @@ class AppleDailyCrawler():
             '      -> daily[%s] has %d posts in %d/%d sections',
             the_day, post_cnt, len(sections), art_tag_cnt)
 
-    def fetch_dailies(self, step=1):
+    def fetch_dailies(self, step=1, year=2003, month=5, day=2):
         """fetch_all
         """
-        start = datetime.date(2003, 5, 2)
+        start = datetime.date(year, month, day)
         end = datetime.datetime.now().date()
         the_day = start
         while True:
@@ -384,6 +385,10 @@ if __name__ == '__main__':
         # CRAWLER.fetch_day(datetime.datetime.now().date()-datetime.timedelta(days=1))
         # CRAWLER.fetch_day(datetime.date(2003, 5, 2))
 
+        # TODO: add fetch_one_day_news_article()
+        # CRAWLER.fetch_dailies(year=2016, month=3, day=1)
+        CRAWLER.fetch_year_articles(year=2016)
+
         # CRAWLER.find_all_sections()
         # CRAWLER.analyze_article_count(3)
         # CRAWLER.analyze_article_count(4)
@@ -391,4 +396,4 @@ if __name__ == '__main__':
         # CRAWLER.analyze_article_count(6)
         # CRAWLER.analyze_article_count(7)
 
-        CRAWLER.fetch_daily_news()
+        # CRAWLER.fetch_daily_news()
