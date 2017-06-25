@@ -373,7 +373,9 @@ if __name__ == '__main__':
         CRAWLER.fetch_daily_news()
     elif sys.argv[1] == 'year':
         CRAWLER = AppleDailyCrawler()
-        CRAWLER.fetch_year_articles(sys.argv[2])
+        YEARS = sys.argv[2].split(',')
+        for year in YEARS:
+            CRAWLER.fetch_year_articles(year, limit=5)
     elif sys.argv[1] == 'test':
         CRAWLER = AppleDailyCrawler()
         # CRAWLER.crawl_article()
