@@ -176,9 +176,9 @@ class AppleDailyCrawler():
         h1_tag = soup.find('h1', {'id': 'h1'})
         h2_tag = soup.find('h2', {'id': 'h2'})
         title = h1_tag.text if h1_tag is not None else ''
-        subtitle = h1_tag.text if h2_tag is not None else ''
+        subtitle = h2_tag.text if h2_tag is not None else ''
         cont = ''
-        cont_tag = soup.find('div', {'class':'articulum'})
+        cont_tag = soup.find('div', {'class': 'articulum'})
         for ctag in cont_tag.find_all(True, recursive=False):
             if ctag.name in ('p', 'h2'):
                 cont += ctag.text
@@ -272,8 +272,13 @@ class AppleDailyCrawler():
         """
         cur = self.conn.cursor()
         for row in cur.execute(SQL_SELECT_DAILY_SECTIONS):
-            secs = json.loads(row[1], encoding='utf-8')
-            arts = json.loads(row[2], encoding='utf-8')
+            # following two lines work on python 3.6, but not python 3.5
+            # secs = json.loads(row[1], encoding='utf-8')
+            # arts = json.loads(row[2], encoding='utf-8')
+            str_secs = row[1].decode('utf-8')
+            str_arts = row[2].decode('utf-8')
+            secs = json.loads(str_secs)
+            arts = json.loads(str_arts)
             for sec in arts:
                 for art in arts[sec]:
                     post_size = len(arts[sec][art])
@@ -290,8 +295,10 @@ class AppleDailyCrawler():
         year_cond = '{0}%'.format(year)
         print(year_cond)
         for row in cur.execute(SQL_SELECT_DAILY_SECTIONS_BY_YEAR, [year_cond]):
-            secs = json.loads(row[1], encoding='utf-8')
-            arts = json.loads(row[2], encoding='utf-8')
+            str_secs = row[1].decode('utf-8')
+            str_arts = row[2].decode('utf-8')
+            secs = json.loads(str_secs)
+            arts = json.loads(str_arts)
             for sec in arts:
                 for art in arts[sec]:
                     post_size = len(arts[sec][art])
