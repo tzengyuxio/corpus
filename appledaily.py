@@ -35,8 +35,8 @@ SELECT 1 FROM articles WHERE url=?
 SQL_CONTAIN_DAILY = '''
 SELECT 1 FROM dailies WHERE id=?
 '''
-SQL_SELECT_TODAY_PICKS = '''
-SELECT id, pick_links FROM today_picks
+SQL_SELECT_DAILY_SECTIONS = '''
+SELECT id, sections, articles FROM dailies 
 '''
 SQL_INSERT_ARTICLE = '''
 INSERT OR IGNORE INTO articles (id, author, publisher, pub_date, url, title, article) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -238,7 +238,7 @@ class AppleDailyCrawler():
         """fetch_articles
         """
         cur = self.conn.cursor()
-        for row in cur.execute(SQL_SELECT_TODAY_PICKS):
+        for row in cur.execute(SQL_SELECT_DAILY_SECTIONS):
             pick_links = json.loads(row[1])
             for url in pick_links:
                 self.fetch_article(url)
@@ -301,7 +301,6 @@ class AppleDailyCrawler():
                     '    ARTICLE [%s] has %d post', art_name, len(art_news))
                 articles[curr_sec][art_name] = art_news
         soup.decompose()
-        self.logger.debug('Total post: %d', post_cnt)
         sections_str = json.dumps(sections, ensure_ascii=False).encode('utf-8')
         articles_str = json.dumps(articles, ensure_ascii=False).encode('utf-8')
         daily_values = [str_day, sections_str, articles_str, post_cnt]
@@ -310,7 +309,7 @@ class AppleDailyCrawler():
             '      -> daily[%s] has %d posts in %d/%d sections',
             the_day, post_cnt, len(sections), art_tag_cnt)
 
-    def fetch_all(self, step=1):
+    def fetch_dailies(self, step=1):
         """fetch_all
         """
         start = datetime.date(2003, 5, 2)
@@ -321,6 +320,47 @@ class AppleDailyCrawler():
                 break
             self.fetch_day(the_day)
             the_day += datetime.timedelta(days=step)
+
+    def find_all_sections(self):
+        """find_all_sections
+        """
+        sections = {}
+        cur = self.conn.cursor()
+        for row in cur.execute(SQL_SELECT_DAILY_SECTIONS):
+            dsecs = json.loads(row[1])
+            for sec in dsecs:
+                if sec not in sections:
+                    sections[sec] = [dsecs[sec]]
+                else:
+                    if dsecs[sec] not in sections[sec]:
+                        sections[sec].append(dsecs[sec])
+        cur.close()
+        for sec in sections:
+            self.logger.info('section[%s]: %s', sec, ','.join(sections[sec]))
+
+    def analyze_article_count(self, limit):
+        """analyze article count
+        """
+        daily_count = {}
+        cur = self.conn.cursor()
+        for row in cur.execute(SQL_SELECT_DAILY_SECTIONS):
+            day_count = 0
+            arts = json.loads(row[2])
+            for sec in arts:
+                # self.logger.info('%s', sec)
+                for art in arts[sec]:
+                    # self.logger.info('    %s', art)
+                    post_size = len(arts[sec][art])
+                    if post_size >= limit:
+                        day_count += 1
+                    # for post in arts[sec][art]:
+                    #     self.logger.info('        %s', post[0])
+            daily_count[row[0]] = day_count
+            # self.logger.info('%s -> %d posts', row[0], day_count)
+        cur.close()
+        avg = sum([daily_count[x] for x in daily_count]) / len(daily_count)
+        self.logger.info('Avg. day count: %.2f when section minimal limit is %d',
+                         avg, limit)
 
 
 def print_usage():
@@ -337,14 +377,21 @@ if __name__ == '__main__':
         sys.exit(0)
     elif sys.argv[1] == 'all':
         CRAWLER = AppleDailyCrawler()
-        CRAWLER.fetch_all()
+        CRAWLER.fetch_dailies()
     elif sys.argv[1] == 'test':
         CRAWLER = AppleDailyCrawler()
         # CRAWLER.crawl_article()
         # CRAWLER.crawl_month(2016, 5, 3, 20)
 
-        CRAWLER.fetch_all(step=300)
+        # CRAWLER.fetch_dailies(step=300)
 
         # CRAWLER.fetch_day(datetime.datetime.now().date())
         # CRAWLER.fetch_day(datetime.datetime.now().date()-datetime.timedelta(days=1))
         # CRAWLER.fetch_day(datetime.date(2003, 5, 2))
+
+        # CRAWLER.find_all_sections()
+        CRAWLER.analyze_article_count(3)
+        CRAWLER.analyze_article_count(4)
+        CRAWLER.analyze_article_count(5)
+        CRAWLER.analyze_article_count(6)
+        CRAWLER.analyze_article_count(7)
