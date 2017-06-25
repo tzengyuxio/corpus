@@ -180,6 +180,9 @@ class AppleDailyCrawler():
         subtitle = h2_tag.text if h2_tag is not None else ''
         cont = ''
         cont_tag = soup.find('div', {'class': 'articulum'})
+        if cont_tag is None:
+            self.logger.error('      -> article[%s] %s has no content',
+                              art_id, href)
         for ctag in cont_tag.find_all(True, recursive=False):
             if ctag.name in ('p', 'h2'):
                 cont += ctag.text
