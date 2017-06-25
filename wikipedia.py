@@ -117,11 +117,11 @@ class WikipediaCrawler():
         formatter = logging.Formatter(
             '%(asctime)s %(levelname)-7s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
-        ifh = logging.FileHandler('crawler-magcnyes.log', encoding='utf-8')
+        ifh = logging.FileHandler('crawler-wikipedia.log', encoding='utf-8')
         ifh.setFormatter(formatter)
         ifh.setLevel(logging.INFO)
         wfh = logging.FileHandler(
-            'crawler-magcnyes-warn.log', encoding='utf-8')
+            'crawler-wikipedia-warn.log', encoding='utf-8')
         wfh.setFormatter(formatter)
         wfh.setLevel(logging.WARN)
         dsh = logging.StreamHandler()
