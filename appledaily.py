@@ -183,6 +183,7 @@ class AppleDailyCrawler():
         if cont_tag is None:
             self.logger.error('      -> article[%s] %s has no content',
                               art_id, href)
+            return
         for ctag in cont_tag.find_all(True, recursive=False):
             if ctag.name in ('p', 'h2'):
                 cont += ctag.text
