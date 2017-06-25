@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Crawler of Books.com
+"""Crawler of news.yahoo
 """
 
 import json
@@ -56,7 +56,6 @@ class NewsYahooCrawler():
     """
 
     def __init__(self):
-        # self.writer = writer
         self.urlopen_count = 0
         self.init_db()
         self.init_logger()
