@@ -4,14 +4,13 @@
 
 import json
 import logging
-import re
 import sqlite3
 import sys
 import datetime
 from random import randint
 from time import sleep
 from urllib.error import HTTPError
-from urllib.request import Request, urljoin, urlopen
+from urllib.request import urlopen
 
 from bs4 import BeautifulSoup
 
@@ -46,10 +45,6 @@ INSERT OR IGNORE INTO dailies (id, sections, articles, article_count) VALUES (?,
 '''
 
 URL_ARCHIVE = 'http://www.appledaily.com.tw/appledaily/archive/{0}'
-URL_NEWS_YAHOO = 'https://tw.news.yahoo.com'
-URL_YAHOO_TODAY = 'https://tw.news.yahoo.com/topic/yahoo-today'
-URL_INDEXDATASERVICE_PATH = '/_td-news/api/resource/IndexDataService.getEditorialList;loadMore=true;count={0};start={1};mrs=%7B%22size%22%3A%7B%22w%22%3A220%2C%22h%22%3A128%7D%7D;uuid=f1d5a047-b405-4a6b-992b-f5298db387f5?'
-URL_INDEXDATASERVICE = URL_NEWS_YAHOO + URL_INDEXDATASERVICE_PATH
 
 
 class AppleDailyCrawler():
@@ -156,50 +151,6 @@ class AppleDailyCrawler():
         self.conn.commit()
         cur.close()
 
-    def fetch_daily_summary_urls(self):
-        """fetch_daily_summary_urls
-        """
-        req = Request(url=URL_INDEXDATASERVICE)
-        count = 30  # most 30
-        start = 0
-        daily_summary_urls = []
-        while True:
-            req = Request(url=URL_INDEXDATASERVICE.format(count, start))
-            with urlopen(req) as furl:
-                if furl.getcode() != 200:
-                    self.logger.error('fetch error when start=%d', start)
-                    break
-                data = json.loads(furl.read().decode('utf-8'))
-                if data is None or len(data) == 0:
-                    self.logger.error('fetch nothing when start=%d', start)
-                    break
-
-                self.logger.info('fetch %d today picks from start=%d',
-                                 len(data), start)
-                for item in data:
-                    summary = [item['id'], item['title'], item['url']]
-                    daily_summary_urls.append(summary)
-                start += len(data)
-        return daily_summary_urls
-
-    def fetch_today_picks(self, daily_summary_urls):
-        """fetch_today_picks
-        """
-        for summary in daily_summary_urls:
-            self.logger.info('fetching today_picks [%s](%s)...',
-                             summary[1], summary[0])
-            self.sleep()
-            url = urljoin(URL_NEWS_YAHOO, summary[2])
-            soup = BeautifulSoup(urlopen(url), PARSER)
-            hrefs = []
-            for elem in soup(text=re.compile(r'詳全文')):
-                if elem.parent.name == 'a':
-                    hrefs.append(elem.parent['href'])
-            soup.decompose()
-            hrefs_json = json.dumps(hrefs)
-            summary.append(hrefs_json)
-            self.insert_daily(summary)
-
     def fetch_article(self, url):
         """fetch_article
         """
@@ -265,7 +216,7 @@ class AppleDailyCrawler():
         if self.contain_daily(str_day):
             self.logger.info('      -> daily[%s] contained and skip', the_day)
             return
-        self.sleep()
+        self.sleep(sec=0)
         url = URL_ARCHIVE.format(str_day)
         soup = BeautifulSoup(urlopen(url), PARSER)
         div = soup.find('div', {'class': 'abdominis'})
