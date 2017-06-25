@@ -36,6 +36,9 @@ SELECT 1 FROM dailies WHERE id=?
 SQL_SELECT_DAILY_SECTIONS = '''
 SELECT id, sections, articles FROM dailies 
 '''
+SQL_SELECT_DAILY_SECTIONS_BY_YEAR = '''
+SELECT id, sections, articles FROM dailies WHERE id LIKE ?
+'''
 SQL_INSERT_ARTICLE = '''
 INSERT OR IGNORE INTO articles (art_id, pub_date, category, section, title, subtitle, article) VALUES (?, ?, ?, ?, ?, ?, ?)
 '''
@@ -167,6 +170,7 @@ class AppleDailyCrawler():
             self.logger.info('      -> article[%s] contained and skip', art_id)
             return
 
+        self.sleep(sec=0)
         #  (art_id, pub_date, category, section, title, subtitle, article)
         soup = BeautifulSoup(urlopen(iri_to_uri(url)), PARSER)
         h1_tag = soup.find('h1', {'id': 'h1'})
@@ -279,6 +283,24 @@ class AppleDailyCrawler():
                         # self.logger.info('%s -> %s', sec_name, href)
                         self.fetch_article(href, sec_name)
 
+    def fetch_year_articles(self, year, limit=7):
+        """fetch year articles
+        """
+        cur = self.conn.cursor()
+        year_cond = '{0}%'.format(year)
+        print(year_cond)
+        for row in cur.execute(SQL_SELECT_DAILY_SECTIONS_BY_YEAR, [year_cond]):
+            secs = json.loads(row[1], encoding='utf-8')
+            arts = json.loads(row[2], encoding='utf-8')
+            for sec in arts:
+                for art in arts[sec]:
+                    post_size = len(arts[sec][art])
+                    if post_size >= limit:
+                        sec_name = '{0}/{1}'.format(secs[sec], art)
+                        href = arts[sec][art][0][0]
+                        # self.logger.info('%s -> %s', sec_name, href)
+                        self.fetch_article(href, sec_name)
+
     def find_all_sections(self):
         """find_all_sections
         """
@@ -326,16 +348,24 @@ def print_usage():
     """
     print('usage: {0} command'.format(sys.argv[0]))
     print('')
-    print('    fetch   fetch ')
+    print('    year [year]    fetch news-post of the year (must in DB)')
+    print('    all-dailies    fetch all dailies news-post list (from 2003-05-02)')
+    print('    all-news       fetch all news-post in DB')
 
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         print_usage()
         sys.exit(0)
-    elif sys.argv[1] == 'all':
+    elif sys.argv[1] == 'all-dailies':
         CRAWLER = AppleDailyCrawler()
         CRAWLER.fetch_dailies()
+    elif sys.argv[1] == 'all-news':
+        CRAWLER = AppleDailyCrawler()
+        CRAWLER.fetch_daily_news()
+    elif sys.argv[1] == 'year':
+        CRAWLER = AppleDailyCrawler()
+        CRAWLER.fetch_year_articles(sys.argv[2])
     elif sys.argv[1] == 'test':
         CRAWLER = AppleDailyCrawler()
         # CRAWLER.crawl_article()
