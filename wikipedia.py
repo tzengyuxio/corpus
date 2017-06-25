@@ -35,7 +35,7 @@ INSERT OR IGNORE INTO articles VALUES (?, ?, ?, ?)
 SQL_INSERT_CORPUS = '''
 INSERT OR IGNORE INTO corpus VALUES (?, ?, ?, ?, ?, ?, ?)
 '''
-SQL_EXISTS_ARTICLES= '''
+SQL_EXISTS_ARTICLES = '''
 SELECT 1 FROM articles WHERE title=?
 '''
 SQL_SELECT_ARTICLES = '''
@@ -98,7 +98,8 @@ class SqliteWriter():
                                v in char_freq_table.items() if is_unihan(k)}
             num_hanzi = sum(char_freq_table.values())
             num_unique = len(char_freq_table)
-            stats = json.dumps(char_freq_table, ensure_ascii=False, sort_keys=True).encode('utf-8')
+            stats = json.dumps(
+                char_freq_table, ensure_ascii=False, sort_keys=True).encode('utf-8')
             cur_ins = self.corpus.cursor()
             cur_ins.execute(SQL_INSERT_CORPUS, (src, idx, raw_text,
                                                 stats, num_char, num_hanzi, num_unique))

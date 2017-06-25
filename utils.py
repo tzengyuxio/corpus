@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """utilities
 """
+import re
+from urllib import parse
 from calendar import monthrange
 from datetime import datetime
 
@@ -40,3 +42,29 @@ def month_range(year, month):
     first_date = '{0:04}-{1:02}-{2:02}'.format(year, month, first)
     last_date = '{0:04}-{1:02}-{2:02}'.format(year, month, last)
     return first_date, last_date
+
+
+def date_iso(date_str):
+    """convert '20170629' to '2017-06-29'
+    """
+    return '{0}-{1}-{2}'.format(date_str[0:4], date_str[4:6], date_str[6:8])
+
+
+def url_encode_non_ascii(byt):
+    """urlEncodeNonAscii
+    """
+    return re.sub('[\x80-\xFF]', lambda c: '%%%02x' % ord(c.group(0)), byt)
+
+
+def iri_to_uri(iri):
+    """iri to uri
+    """
+    parts = parse.urlsplit(iri)
+    parts = list(parts)
+    parts[2] = parse.quote(parts[2])
+    return parse.urlunsplit(parts)
+    # return parse.urlunparse(
+    #     part.encode('idna') if parti == 1 else url_encode_non_ascii(
+    #         part.encode('utf-8'))
+    #     for parti, part in enumerate(parts)
+    # )

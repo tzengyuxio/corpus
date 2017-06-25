@@ -9,17 +9,16 @@ import sys
 import datetime
 from random import randint
 from time import sleep
-from urllib.error import HTTPError
-from urllib.request import urlopen
+from urllib.request import urljoin, urlopen
 
 from bs4 import BeautifulSoup
 
-from utils import PARSER
+from utils import PARSER, date_iso, iri_to_uri
 
 SQL_CREATE_TABLE_ARTICLES = '''
 CREATE TABLE IF NOT EXISTS articles (
-    id TEXT, author TEXT, publisher TEXT, pub_date TEXT, url TEXT, title TEXT, article TEXT,
-    PRIMARY KEY(id)
+    art_id TEXT, pub_date TEXT, category TEXT, section TEXT, title TEXT, subtitle TEXT, article TEXT,
+    PRIMARY KEY(art_id)
 )
 '''
 SQL_CREATE_TABLE_DAILIES = '''
@@ -29,7 +28,7 @@ CREATE TABLE IF NOT EXISTS dailies (
 )
 '''
 SQL_CONTAIN_ARTICLE = '''
-SELECT 1 FROM articles WHERE url=?
+SELECT 1 FROM articles WHERE art_id=?
 '''
 SQL_CONTAIN_DAILY = '''
 SELECT 1 FROM dailies WHERE id=?
@@ -38,12 +37,13 @@ SQL_SELECT_DAILY_SECTIONS = '''
 SELECT id, sections, articles FROM dailies 
 '''
 SQL_INSERT_ARTICLE = '''
-INSERT OR IGNORE INTO articles (id, author, publisher, pub_date, url, title, article) VALUES (?, ?, ?, ?, ?, ?, ?)
+INSERT OR IGNORE INTO articles (art_id, pub_date, category, section, title, subtitle, article) VALUES (?, ?, ?, ?, ?, ?, ?)
 '''
 SQL_INSERT_DAILY = '''
 INSERT OR IGNORE INTO dailies (id, sections, articles, article_count) VALUES (?, ?, ?, ?)
 '''
 
+URL_APPLEDAILY = 'http://www.appledaily.com.tw/'
 URL_ARCHIVE = 'http://www.appledaily.com.tw/appledaily/archive/{0}'
 
 
@@ -63,7 +63,7 @@ class AppleDailyCrawler():
         """
         self.conn = sqlite3.connect('source-appledaily.db')
         cur = self.conn.cursor()
-        # cur.execute(SQL_CREATE_TABLE_ARTICLES)
+        cur.execute(SQL_CREATE_TABLE_ARTICLES)
         cur.execute(SQL_CREATE_TABLE_DAILIES)
         self.conn.commit()
         cur.close()
@@ -117,11 +117,11 @@ class AppleDailyCrawler():
         else:
             sleep(randint(1, 3))
 
-    def contain_article(self, link):
+    def contain_article(self, art_id):
         """contain_article
         """
         cur = self.conn.cursor()
-        cur.execute(SQL_CONTAIN_ARTICLE, [link])
+        cur.execute(SQL_CONTAIN_ARTICLE, [art_id])
         result = True if cur.fetchone() is not None else False
         cur.close()
         return result
@@ -151,48 +151,39 @@ class AppleDailyCrawler():
         self.conn.commit()
         cur.close()
 
-    def fetch_article(self, url):
+    def fetch_article(self, href, section_name):
         """fetch_article
         """
-        self.logger.info('fetching article(%s)...', url)
-        if self.contain_article(url):
-            self.logger.info('      -> already saved link: %s', url)
+        href = href.replace('\r', ' ')
+        url = urljoin(URL_APPLEDAILY, href)
+        href_token = href.split('/')
+        if 'home.appledaily' in href:
+            cate, date_str, art_id = 'home', href_token[5], href_token[6]
+        else:
+            cate, date_str, art_id = href_token[3], href_token[4], href_token[5]
+        # self.logger.info('%s, %s, %s', pub_date, art_id, href)
+        self.logger.info('fetching article[%s] %s...', art_id, href)
+        if self.contain_article(art_id):
+            self.logger.info('      -> article[%s] contained and skip', art_id)
             return
-        self.sleep()
-        try:
-            soup = BeautifulSoup(urlopen(url), PARSER)
-            title = soup.find('header').text
-            art = soup.find('article').text
-            uuid = soup.find('article')['data-uuid']
-            pub_date = soup.find('time')['datetime'][:10]
-            author_tag = soup.find('div', {'class': 'author'})
-            provdr_tag = soup.find('span', {'class': 'provider-link'})
-            author = author_tag.text if author_tag != None else ''
-            provider = provdr_tag.text if provdr_tag != None else ''
-            soup.decompose()
-            article_values = [uuid, author, provider,
-                              pub_date, url, title, art]
-            self.insert_article(article_values)
-            self.logger.info(
-                '      -> [%s] by "%s|%s" at %s', title, provider, author, pub_date)
-        except HTTPError as err:
-            self.logger.error(
-                '      -> article(%s) fetch fail: %s', url, err)
-        except KeyError as err:
-            self.logger.error(
-                '      -> article(%s) fetch fail: KeyError: %s', url, err)
-        except AttributeError as err:
-            self.logger.error(
-                '      -> article(%s) fetch fail: AttributeError: %s', url, err)
 
-    def fetch_articles(self):
-        """fetch_articles
-        """
-        cur = self.conn.cursor()
-        for row in cur.execute(SQL_SELECT_DAILY_SECTIONS):
-            pick_links = json.loads(row[1])
-            for url in pick_links:
-                self.fetch_article(url)
+        #  (art_id, pub_date, category, section, title, subtitle, article)
+        soup = BeautifulSoup(urlopen(iri_to_uri(url)), PARSER)
+        h1_tag = soup.find('h1', {'id': 'h1'})
+        h2_tag = soup.find('h2', {'id': 'h2'})
+        title = h1_tag.text if h1_tag is not None else ''
+        subtitle = h1_tag.text if h2_tag is not None else ''
+        cont = ''
+        cont_tag = soup.find('div', {'class':'articulum'})
+        for ctag in cont_tag.find_all(True, recursive=False):
+            if ctag.name in ('p', 'h2'):
+                cont += ctag.text
+        soup.decompose()
+        pub_date = date_iso(date_str)
+        article_values = [art_id, pub_date, cate,
+                          section_name, title, subtitle, cont]
+        self.insert_article(article_values)
+        self.logger.info('      -> article[%s] %s saved', art_id, title)
 
     def fetch_daily_article_tag(self, article_tag):
         """fetch_daily_article_tag
@@ -272,6 +263,22 @@ class AppleDailyCrawler():
             self.fetch_day(the_day)
             the_day += datetime.timedelta(days=step)
 
+    def fetch_daily_news(self, limit=7):
+        """fetch_daily_news
+        """
+        cur = self.conn.cursor()
+        for row in cur.execute(SQL_SELECT_DAILY_SECTIONS):
+            secs = json.loads(row[1], encoding='utf-8')
+            arts = json.loads(row[2], encoding='utf-8')
+            for sec in arts:
+                for art in arts[sec]:
+                    post_size = len(arts[sec][art])
+                    if post_size >= limit:
+                        sec_name = '{0}/{1}'.format(secs[sec], art)
+                        href = arts[sec][art][0][0]
+                        # self.logger.info('%s -> %s', sec_name, href)
+                        self.fetch_article(href, sec_name)
+
     def find_all_sections(self):
         """find_all_sections
         """
@@ -341,8 +348,10 @@ if __name__ == '__main__':
         # CRAWLER.fetch_day(datetime.date(2003, 5, 2))
 
         # CRAWLER.find_all_sections()
-        CRAWLER.analyze_article_count(3)
-        CRAWLER.analyze_article_count(4)
-        CRAWLER.analyze_article_count(5)
-        CRAWLER.analyze_article_count(6)
-        CRAWLER.analyze_article_count(7)
+        # CRAWLER.analyze_article_count(3)
+        # CRAWLER.analyze_article_count(4)
+        # CRAWLER.analyze_article_count(5)
+        # CRAWLER.analyze_article_count(6)
+        # CRAWLER.analyze_article_count(7)
+
+        CRAWLER.fetch_daily_news()

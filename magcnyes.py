@@ -11,7 +11,7 @@ from urllib.request import Request, urljoin, urlopen
 
 from bs4 import BeautifulSoup
 
-from utils import PARSER, datetime_iso, is_unihan, month_range
+from utils import PARSER, datetime_iso, is_unihan, month_range, date_iso
 
 SQL_CREATE_TABLE_ARTICLES = '''
 CREATE TABLE IF NOT EXISTS articles (
@@ -244,8 +244,9 @@ class MagCnyesCrawler():
                 url_page = bnext_btns[0].get('href')
             soup.decompose()
 
-        pub_date = '{0}-{1}-{2}'.format(url_first[9:13],
-                                        url_first[13:15], url_first[15:17])
+        # pub_date = '{0}-{1}-{2}'.format(url_first[9:13],
+        #                                 url_first[13:15], url_first[15:17])
+        pub_date = date_iso(url_first[9:17])
         article_values = [art_id, col_id, self.columns[col_id],
                           mag_name, pub_date, title, full_title, cont]
         self.insert_article(article_values)
