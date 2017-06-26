@@ -7,6 +7,7 @@ import sqlite3
 import sys
 from random import randint
 from time import sleep
+from urllib.error import HTTPError
 from urllib.request import Request, urljoin, urlopen
 
 from bs4 import BeautifulSoup
@@ -230,19 +231,24 @@ class MagCnyesCrawler():
             self.sleep(sec=0)
             page_cnt += 1
             url = urljoin(url_base, url_page)
-            soup = BeautifulSoup(urlopen(url), PARSER)
-            div_contents = soup.find_all('div', {'class': 'content'})
-            if div_contents is None or len(div_contents) == 0:
-                self.logger.warning(
-                    '      -> article[%s] content broken', art_id)
+            try:
+                soup = BeautifulSoup(urlopen(url), PARSER)
+                div_contents = soup.find_all('div', {'class': 'content'})
+                if div_contents is None or len(div_contents) == 0:
+                    self.logger.warning(
+                        '      -> article[%s] content broken', art_id)
+                    return
+                cont += div_contents[0].text
+                bnext_btns = soup.find_all('a', {'class': 'bnext'})
+                if len(bnext_btns) == 0:
+                    url_page = None
+                else:
+                    url_page = bnext_btns[0].get('href')
+                soup.decompose()
+            except HTTPError as err:
+                self.logger.error('      -> article[%s] return code %d',
+                                  art_id, err.code)
                 return
-            cont += div_contents[0].text
-            bnext_btns = soup.find_all('a', {'class': 'bnext'})
-            if len(bnext_btns) == 0:
-                url_page = None
-            else:
-                url_page = bnext_btns[0].get('href')
-            soup.decompose()
 
         # pub_date = '{0}-{1}-{2}'.format(url_first[9:13],
         #                                 url_first[13:15], url_first[15:17])
