@@ -284,8 +284,8 @@ class MagCnyesCrawler():
     def fetch_all(self):
         """fetch_all
         """
-        start = (2013, 7)
-        end = (2017, 6)
+        start = (2006, 1)  # (2013, 7)
+        end = (2013, 7)  # (2017, 6)
         page_size = 100
         for year in range(start[0], end[0] + 1):
             start_month = start[1] if year == start[0] else 1
