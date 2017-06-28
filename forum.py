@@ -131,7 +131,7 @@ class AppleForumCrawler():
         if cont_tag is None:
             self.logger.error('      -> article[%s] %s has no content',
                               art_id, href)
-            return
+            return []
         for ctag in cont_tag.find_all(True, recursive=False):
             if ctag.name == 'p':
                 cont += ctag.text
@@ -192,6 +192,8 @@ class AppleForumCrawler():
                         break
                     continue
                 art_values = self.fetch_article(*art_info)
+                if len(art_values) == 0:
+                    continue
                 self.save_article(art_values)
                 self.logger.info(
                     '      -> article[%s] %s saved', art_id, art_info[1])
