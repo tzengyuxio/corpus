@@ -4,7 +4,10 @@
 
 import json
 import sqlite3
-from utils import is_unihan, datetime_iso
+import sys
+
+from utils import datetime_iso, is_unihan
+
 
 SQL_CREATE_ARTICLES = '''
 CREATE TABLE IF NOT EXISTS articles (
@@ -30,19 +33,19 @@ class HanziCalculator():
         self.conn.commit()
         cur.close()
 
-    def calc_forum(self):
-        """calc forum db
+    def calc_articles(self, src, src_db_name, sql_query):
+        """calc hanzi freq articles
         """
         art_cnt = 0
-        src = 'appledaily.forum.926953'
-        src_db = sqlite3.connect('source-forum.db')
+        src_db = sqlite3.connect(src_db_name)
+        src_db.row_factory = sqlite3.Row
         src_cur = src_db.cursor()
-        total_hz_freq = {}
-        for i, row in enumerate(src_cur.execute('SELECT * FROM articles')):
+        all_hz_freq = {}
+        for i, row in enumerate(src_cur.execute(sql_query)):
             art_cnt += 1
-            idx = row[0]
-            pub_date = row[4]
-            raw_text = '{0}\n{1}\n\n{2}'.format(row[5], row[6], row[7])
+            idx = row['art_id']
+            pub_date = row['pub_date']
+            raw_text = row['raw_text']
             chr_freq = {}
             for char in raw_text:
                 if char in chr_freq:
@@ -51,10 +54,10 @@ class HanziCalculator():
                     chr_freq[char] = 1
             hz_freq = {k: v for k, v in chr_freq.items() if is_unihan(k)}
             for k in hz_freq:
-                if k in total_hz_freq:
-                    total_hz_freq[k] += hz_freq[k]
+                if k in all_hz_freq:
+                    all_hz_freq[k] += hz_freq[k]
                 else:
-                    total_hz_freq[k] = hz_freq[k]
+                    all_hz_freq[k] = hz_freq[k]
             stats = json.dumps(hz_freq, ensure_ascii=False,
                                sort_keys=True).encode('utf-8')
             hanzi_cnt = len(hz_freq)
@@ -62,16 +65,64 @@ class HanziCalculator():
             rec = [src, idx, pub_date, raw_text, stats, hanzi_cnt, hanzi_sum]
             cur = self.conn.cursor()
             cur.execute(SQL_INSERT_ARTICLES, rec)
-            print('{0} INFO {1:05} calc article[{2}]... cnt:{3}/sum:{4}'.format(
+            print('{0} INFO {1:05} calc article[{2}]... hanzi cnt/sum: {3}/{4}'.format(
                 datetime_iso(), i, idx, hanzi_cnt, hanzi_sum))
         src_cur.close()
         self.conn.commit()
-        print('----------------------------------------')
-        print('total text count: {0:>12,}'.format(art_cnt))
-        print('hanzi unique cnt: {0:>12,}'.format(len(total_hz_freq)))
-        print('hanzi total sum:  {0:>12,}'.format(sum(total_hz_freq.values())))
+        print('')
+        print('### [{0}] ##############################'.format(src))
+        print('  total text cnt: {0:>12,}'.format(art_cnt))
+        print('  hanzi uniq cnt: {0:>12,}'.format(len(all_hz_freq)))
+        print('  hanzi char sum: {0:>12,}'.format(sum(all_hz_freq.values())))
+        print('')
 
 
 if __name__ == '__main__':
     CALC = HanziCalculator()
-    CALC.calc_forum()
+    if sys.argv[1] == 'forum':
+        CALC.calc_articles(
+            'appledaily.forum.926953',
+            'source-forum.db',
+            '''SELECT art_id, pub_date,
+               title || x'0a' || subtitle || x'0a0a' || article AS raw_text
+               FROM articles'''
+        )
+    elif sys.argv[1] == 'apple':
+        CALC.calc_articles(
+            'news.apple',
+            'source-appledaily.db',
+            '''SELECT art_id, pub_date,
+               title || x'0a' || subtitle || x'0a0a' || article AS raw_text
+               FROM articles'''
+        )
+    elif sys.argv[1] == 'books':
+        CALC.calc_articles(
+            'books',
+            'source-books.db',
+            '''SELECT book_no AS art_id, pub_date, title || article AS raw_text
+               FROM articles'''
+        )
+    elif sys.argv[1] == 'cnyes':
+        CALC.calc_articles(
+            'mag.cnyes',
+            'source-magcnyes.db',
+            '''SELECT art_id, pub_date,
+               full_title || x'0a0a' || article AS raw_text
+               FROM articles'''
+        )
+    elif sys.argv[1] == 'yahoo':
+        CALC.calc_articles(
+            'news.yahoo',
+            'source-newsyahoo.db',
+            '''SELECT id AS art_id, pub_date,
+               title || x'0a0a' || article AS raw_Text
+               FROM articles'''
+        )
+    elif sys.argv[1] == 'wiki':
+        CALC.calc_articles(
+            'wikipedia',
+            'source-wikipedia.db',
+            '''SELECT title AS art_id, open_date AS pub_date,
+               title || x'0a0a' || article AS raw_text
+               FROM articles'''
+        )
