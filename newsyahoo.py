@@ -14,7 +14,7 @@ from urllib.request import Request, urljoin, urlopen
 
 from bs4 import BeautifulSoup
 
-from utils import PARSER, datetime_iso, is_unihan
+from utils import PARSER
 
 SQL_CREATE_TABLE_ARTICLES = '''
 CREATE TABLE IF NOT EXISTS articles (
@@ -45,10 +45,6 @@ URL_NEWS_YAHOO = 'https://tw.news.yahoo.com'
 URL_YAHOO_TODAY = 'https://tw.news.yahoo.com/topic/yahoo-today'
 URL_INDEXDATASERVICE_PATH = '/_td-news/api/resource/IndexDataService.getEditorialList;loadMore=true;count={0};start={1};mrs=%7B%22size%22%3A%7B%22w%22%3A220%2C%22h%22%3A128%7D%7D;uuid=f1d5a047-b405-4a6b-992b-f5298db387f5?'
 URL_INDEXDATASERVICE = URL_NEWS_YAHOO + URL_INDEXDATASERVICE_PATH
-
-SQL_INSERT_CORPUS = '''
-INSERT OR IGNORE INTO corpus VALUES (?, ?, ?, ?, ?, ?, ?)
-'''
 
 
 class NewsYahooCrawler():
@@ -221,39 +217,6 @@ class NewsYahooCrawler():
             for url in pick_links:
                 self.fetch_article(url)
 
-    def calc_all(self):
-        """calc_all
-        """
-        # corpus (src TEXT, idx TEXT, raw_text TEXT, stats TEXT, num_char
-        # INTEGER, num_hanzi INTEGER, num_unique INTEGER,
-        cur = self.conn.cursor()
-        for row in cur.execute('SELECT * FROM articles'):
-            src = 'newsyahoo'
-            idx = row[0]
-            raw_text = '{0}\n{1}'.format(row[1], row[5])
-            trimed_text = raw_text.replace(' ', '').replace('\n', '')
-            num_char = len(trimed_text)
-            char_freq_table = {}
-            for char in trimed_text:
-                if char in char_freq_table:
-                    char_freq_table[char] += 1
-                else:
-                    char_freq_table[char] = 1
-            char_freq_table = {k: v for k,
-                               v in char_freq_table.items() if is_unihan(k)}
-            num_hanzi = sum(char_freq_table.values())
-            num_unique = len(char_freq_table)
-            stats = json.dumps(
-                char_freq_table, ensure_ascii=False, sort_keys=True).encode('utf-8')
-            # cur_ins = self.corpus.cursor()
-            # cur_ins.execute(SQL_INSERT_CORPUS, (src, idx, raw_text,
-            # stats, num_char, num_hanzi, num_unique))
-            print('{0} [INFO] Calc news[{1}] ... num(char/hanzi/unique) = {2}/{3}/{4}'.format(
-                datetime_iso(), row[0], num_char, num_hanzi, num_unique))
-            # cur_ins.close()
-        cur.close()
-        # self.corpus.commit()
-
     def fetch_all(self):
         """fetch_all
         """
@@ -280,9 +243,6 @@ if __name__ == '__main__':
     elif sys.argv[1] == 'fetch':
         NEWS = NewsYahooCrawler()
         NEWS.fetch_all()
-    elif sys.argv[1] == 'calc':
-        NEWS = NewsYahooCrawler()
-        NEWS.calc_all()
     elif sys.argv[1] == 'test':
         CRAWLER = NewsYahooCrawler()
         # CRAWLER.crawl_article()

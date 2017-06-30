@@ -12,7 +12,7 @@ from urllib.request import Request, urljoin, urlopen
 
 from bs4 import BeautifulSoup
 
-from utils import PARSER, datetime_iso, is_unihan, month_range, date_iso
+from utils import PARSER, date_iso, month_range
 
 SQL_CREATE_TABLE_ARTICLES = '''
 CREATE TABLE IF NOT EXISTS articles (
@@ -41,83 +41,12 @@ INSERT OR IGNORE INTO rankings
 
 URL_NEWARTICLE = 'http://mag.cnyes.com/WebService/WebAjaxSvr.asmx/NewArticle'
 
-SQL_CREATE_MAGCNYES_RANKINGS = '''
-CREATE TABLE IF NOT EXISTS
-    rankings (year INTEGER, month INTEGER, col_id INTEGER, top INTEGER,
-    col_name TEXT, art_id TEXT, title TEXT, full_title TEXT, mag_name TEXT, url TEXT,
-    PRIMARY KEY(year, month, col_id, top))
-'''
-SQL_CREATE_MAGCNYES_ARTICLES = '''
-CREATE TABLE IF NOT EXISTS
-    articles (art_id TEXT, col_id INTEGER, col_name TEXT, title TEXT, full_title TEXT, mag_name TEXT, published TEXT, url TEXT, cont TEXT,
-    PRIMARY KEY(art_id))
-'''
-# num_char:   number of character in raw_text except space and new-line
-# num_hanzi:  number of hanzi in raw_text
-# num_unique: number of unique hanze in raw_text
-SQL_CREATE_CORPUS = '''
-CREATE TABLE IF NOT EXISTS
-    corpus (src TEXT, idx TEXT, raw_text TEXT, stats TEXT, num_char INTEGER, num_hanzi INTEGER, num_unique INTEGER,
-    PRIMARY KEY(src, idx))
-'''
-SQL_INSERT_CORPUS = '''
-INSERT OR IGNORE INTO corpus VALUES (?, ?, ?, ?, ?, ?, ?)
-'''
-SQL_SELECT_ARTICLES = '''
-SELECT art_id, full_title, cont FROM articles WHERE substr(published, 0, 5)="2016"
-'''
-
-
-class SqliteWriter():
-    """SQLite Writer
-    """
-
-    def __init__(self):
-        self.conn = sqlite3.connect('magcnyes.db')
-        # cur = self.conn.cursor()
-        # cur.execute(SQL_CREATE_MAGCNYES_RANKINGS)
-        # cur.execute(SQL_CREATE_MAGCNYES_ARTICLES)
-        # self.conn.commit()
-        # cur.close()
-
-    def select_articles(self):
-        """select_book
-        """
-        cur = self.conn.cursor()
-        for row in cur.execute(SQL_SELECT_ARTICLES):
-            src = 'magcnyes'
-            idx = row[0]
-            raw_text = '{0}\n\n{1}'.format(row[1], row[2])
-            trimed_text = raw_text.replace(' ', '').replace('\n', '')
-            num_char = len(trimed_text)
-            char_freq_table = {}
-            for char in trimed_text:
-                if char in char_freq_table:
-                    char_freq_table[char] += 1
-                else:
-                    char_freq_table[char] = 1
-            char_freq_table = {k: v for k,
-                               v in char_freq_table.items() if is_unihan(k)}
-            num_hanzi = sum(char_freq_table.values())
-            num_unique = len(char_freq_table)
-            stats = json.dumps(
-                char_freq_table, ensure_ascii=False, sort_keys=True).encode('utf-8')
-            # cur_ins = self.corpus.cursor()
-            # cur_ins.execute(SQL_INSERT_CORPUS, (src, idx, raw_text,
-            # stats, num_char, num_hanzi, num_unique))
-            print('{0} [INFO] Calc article[{1}] ... num(char/hanzi/unique) = {2}/{3}/{4}'.format(
-                datetime_iso(), row[0], num_char, num_hanzi, num_unique))
-            # cur_ins.close()
-        cur.close()
-        # self.corpus.commit()
-
 
 class MagCnyesCrawler():
     """Crawler of MagCnyes
     """
 
-    def __init__(self, writer):
-        self.writer = writer
+    def __init__(self):
         self.urlopen_count = 0
         self.columns = {1: u'時尚', 2: u'生活', 7: u'醫美', 8: u'旅遊',
                         9: u'藝文', 10: u'設計', 3: u'商業', 5: u'理財', 6: u'科技'}
@@ -290,8 +219,8 @@ class MagCnyesCrawler():
     def fetch_all(self):
         """fetch_all
         """
-        start = (2006, 1)  # (2013, 7)
-        end = (2013, 7)  # (2017, 6)
+        start = (2017, 4)  # (2006, 1)
+        end = (2017, 7)  # (2017, 7)
         page_size = 100
         for year in range(start[0], end[0] + 1):
             start_month = start[1] if year == start[0] else 1
@@ -299,11 +228,6 @@ class MagCnyesCrawler():
             for month in range(start_month, end_month):
                 for col_id in self.columns:
                     self.crawl_month(year, month, col_id, page_size)
-
-    def calc_all(self):
-        """calc_all
-        """
-        self.writer.select_articles()
 
 
 def print_usage():
@@ -319,20 +243,13 @@ if __name__ == '__main__':
         print_usage()
         sys.exit(0)
     elif sys.argv[1] == 'all':
-        WRITER = SqliteWriter()
-        CRAWLER = MagCnyesCrawler(WRITER)
+        CRAWLER = MagCnyesCrawler()
         CRAWLER.fetch_all()
     elif sys.argv[1] == 'fetch':
-        WRITER = SqliteWriter()
-        MAG = MagCnyesCrawler(WRITER)
+        MAG = MagCnyesCrawler()
         MAG.fetch_all()
         # MAG.fetch_month(2017, 4, 7)
-    elif sys.argv[1] == 'calc':
-        WRITER = SqliteWriter()
-        MAG = MagCnyesCrawler(WRITER)
-        MAG.calc_all()
     elif sys.argv[1] == 'test':
-        WRITER = SqliteWriter()
-        CRAWLER = MagCnyesCrawler(WRITER)
+        CRAWLER = MagCnyesCrawler()
         # CRAWLER.crawl_article()
         CRAWLER.crawl_month(2016, 5, 3, 20)

@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 """Crawler of Books.com
 """
-import json
 import logging
 import sqlite3
 import sys
 from random import randint
-from time import sleep, time
+from time import sleep
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
 from bs4 import BeautifulSoup
 
-from utils import PARSER, datetime_iso, is_unihan
+from utils import PARSER, is_unihan
 
 SQL_CREATE_TABLE_ARTICLES = '''
 CREATE TABLE IF NOT EXISTS articles (
@@ -51,89 +50,12 @@ URL_PRODUCT = 'http://www.books.com.tw/products/{0}'
 URL_SERIALTEXT = 'http://www.books.com.tw/web/sys_serialtext/?item={0}'
 URL_SERIALTEXT_PAGE = URL_SERIALTEXT + '&page={1}'
 
-# num_char:   number of character in raw_text except space and new-line
-# num_hanzi:  number of hanzi in raw_text
-# num_unique: number of unique hanze in raw_text
-SQL_CREATE_CORPUS = '''
-CREATE TABLE IF NOT EXISTS
-    corpus (src TEXT, idx TEXT, raw_text TEXT, stats TEXT, num_char INTEGER, num_hanzi INTEGER, num_unique INTEGER,
-    PRIMARY KEY(src, idx))
-'''
-SQL_INSERT_CORPUS = '''
-INSERT OR IGNORE INTO corpus VALUES (?, ?, ?, ?, ?, ?, ?)
-'''
-SQL_SELECT_BOOKS = '''
-SELECT * FROM books WHERE page_count > 0
-'''
-
-
-class SqliteWriter():
-    """SQLite Writer
-    """
-
-    def __init__(self):
-        self.conn = sqlite3.connect('books.db')
-        cur = self.conn.cursor()
-        cur.execute(SQL_CREATE_TABLE_ARTICLES)
-        self.conn.commit()
-        cur.close()
-
-    def select_book(self):
-        """select_book
-        """
-        cur = self.conn.cursor()
-        for row in cur.execute(SQL_SELECT_BOOKS):
-            src = 'books'
-            idx = row[0]
-            raw_text = '{0}\n\n{1}\n{2}'.format(row[1], row[2], row[5])
-            trimed_text = raw_text.replace(' ', '').replace('\n', '')
-            num_char = len(trimed_text)
-            char_freq_table = {}
-            for char in trimed_text:
-                if char in char_freq_table:
-                    char_freq_table[char] += 1
-                else:
-                    char_freq_table[char] = 1
-            char_freq_table = {k: v for k,
-                               v in char_freq_table.items() if is_unihan(k)}
-            num_hanzi = sum(char_freq_table.values())
-            num_unique = len(char_freq_table)
-            stats = json.dumps(
-                char_freq_table, ensure_ascii=False, sort_keys=True).encode('utf-8')
-            # cur_ins = self.corpus.cursor()
-            # cur_ins.execute(SQL_INSERT_CORPUS, (src, idx, raw_text,
-            # stats, num_char, num_hanzi, num_unique))
-            print('{0} [INFO] Calc book[{1}] ... num(char/hanzi/unique) = {2}/{3}/{4}'.format(
-                datetime_iso(), row[0], num_char, num_hanzi, num_unique))
-            # cur_ins.close()
-        cur.close()
-        # self.corpus.commit()
-
-    def book_no_list(self):
-        """insert_published
-        """
-        cur = self.conn.cursor()
-        result = [(row[0], row[1]) for row in cur.execute(
-            'SELECT book_no, published FROM books')]
-        cur.close()
-        return result
-
-    def update_published(self, book_no, published):
-        """update_published
-        """
-        cur = self.conn.cursor()
-        cur.execute('UPDATE books SET published=? WHERE book_no=?',
-                    (published, book_no))
-        self.conn.commit()
-        cur.close()
-
 
 class BooksCrawler():
     """Crawler of Books.com
     """
 
-    def __init__(self, writer):
-        self.writer = writer
+    def __init__(self):
         self.urlopen_count = 0
         self.init_db()
         self.init_logger()
@@ -322,20 +244,12 @@ class BooksCrawler():
         """fetch_all
         """
         start = (2013, 7)
-        end = (2017, 6)
+        end = (2017, 7)
         for year in range(start[0], end[0] + 1):
             start_month = start[1] if year == start[0] else 1
             end_month = end[1] if year == end[0] else 13
             for month in range(start_month, end_month):
                 self.crawl_month(year, month)
-
-    def calc_all(self):
-        """calc_all
-        """
-        t_start = time()
-        self.writer.select_book()
-        t_end = time()
-        print(t_end - t_start)
 
 
 def print_usage():
@@ -351,16 +265,10 @@ if __name__ == '__main__':
         print_usage()
         sys.exit(0)
     elif sys.argv[1] == 'all':
-        WRITER = SqliteWriter()
-        CRAWLER = BooksCrawler(WRITER)
+        CRAWLER = BooksCrawler()
         CRAWLER.fetch_all()
-    elif sys.argv[1] == 'calc':
-        WRITER = SqliteWriter()
-        CRAWLER = BooksCrawler(WRITER)
-        CRAWLER.calc_all()
     elif sys.argv[1] == 'test':
-        WRITER = SqliteWriter()
-        CRAWLER = BooksCrawler(WRITER)
+        CRAWLER = BooksCrawler()
         # CRAWLER.crawl_book('0010743217', '房思琪的初戀樂園', '林奕含')
         # CRAWLER.crawl_month(2017, 5)
         CRAWLER.crawl_book('0010592444', '謎情柯洛斯III', '林奕含')
