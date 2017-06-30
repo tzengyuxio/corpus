@@ -80,12 +80,13 @@ class HanziCalculator():
 if __name__ == '__main__':
     CALC = HanziCalculator()
     if sys.argv[1] == 'forum':
+        FID = sys.argv[2]
         CALC.calc_articles(
-            'appledaily.forum.926953',
+            'appledaily.forum.{0}'.format(FID),
             'source-forum.db',
             '''SELECT art_id, pub_date,
                title || x'0a' || subtitle || x'0a0a' || article AS raw_text
-               FROM articles'''
+               FROM articles WHERE forum_id="{0}"'''.format(FID)
         )
     elif sys.argv[1] == 'apple':
         CALC.calc_articles(
