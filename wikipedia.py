@@ -2,7 +2,6 @@
 """Crawler of Wikipedia
 """
 
-import json
 import logging
 import sqlite3
 import sys
@@ -12,7 +11,7 @@ from urllib.request import urlopen
 
 from bs4 import BeautifulSoup
 
-from utils import PARSER, datetime_iso, is_unihan
+from utils import PARSER
 
 SQL_CREATE_TABLE_ARTICLES = '''
 CREATE TABLE IF NOT EXISTS articles (
@@ -30,71 +29,11 @@ URL_WIKI_LIST = 'https://zh.wikipedia.org/zh-tw/Wikipedia:%E7%89%B9%E8%89%B2%E6%
 URL_WIKI_ARTICLE = 'https://zh.wikipedia.org/zh-tw/{0}'
 
 
-# num_char:   number of character in raw_text except space and new-line
-# num_hanzi:  number of hanzi in raw_text
-# num_unique: number of unique hanze in raw_text
-SQL_CREATE_CORPUS = '''
-CREATE TABLE IF NOT EXISTS
-    corpus (src TEXT, idx TEXT, raw_text TEXT, stats TEXT, num_char INTEGER, num_hanzi INTEGER, num_unique INTEGER,
-    PRIMARY KEY(src, idx))
-'''
-SQL_INSERT_CORPUS = '''
-INSERT OR IGNORE INTO corpus VALUES (?, ?, ?, ?, ?, ?, ?)
-'''
-SQL_SELECT_ARTICLES = '''
-SELECT title, cont FROM articles
-'''
-
-
-class SqliteWriter():
-    """SQLite Writer
-    """
-
-    def __init__(self):
-        self.conn = sqlite3.connect('wikipedia.db')
-        cur = self.conn.cursor()
-        cur.execute(SQL_CREATE_TABLE_ARTICLES)
-        self.conn.commit()
-        cur.close()
-
-    def select_articles(self):
-        """select_articles
-        """
-        cur = self.conn.cursor()
-        for row in cur.execute(SQL_SELECT_ARTICLES):
-            src = 'wikipedia'
-            idx = row[0]
-            raw_text = '{0}\n\n{1}'.format(row[0], row[1])
-            trimed_text = raw_text.replace(' ', '').replace('\n', '')
-            num_char = len(trimed_text)
-            char_freq_table = {}
-            for char in trimed_text:
-                if char in char_freq_table:
-                    char_freq_table[char] += 1
-                else:
-                    char_freq_table[char] = 1
-            char_freq_table = {k: v for k,
-                               v in char_freq_table.items() if is_unihan(k)}
-            num_hanzi = sum(char_freq_table.values())
-            num_unique = len(char_freq_table)
-            stats = json.dumps(
-                char_freq_table, ensure_ascii=False, sort_keys=True).encode('utf-8')
-            # cur_ins = self.corpus.cursor()
-            # cur_ins.execute(SQL_INSERT_CORPUS, (src, idx, raw_text,
-            # stats, num_char, num_hanzi, num_unique))
-            print('{0} [INFO] Calc articles[{1}] ... num(char/hanzi/unique) = {2}/{3}/{4}'.format(
-                datetime_iso(), row[0], num_char, num_hanzi, num_unique))
-            # cur_ins.close()
-        cur.close()
-        # self.corpus.commit()
-
-
 class WikipediaCrawler():
     """Crawler of Wikipedia
     """
 
-    def __init__(self, writer):
-        self.writer = writer
+    def __init__(self):
         self.urlopen_count = 0
         self.init_db()
         self.init_logger()
@@ -262,11 +201,6 @@ class WikipediaCrawler():
             self.fetch_article(idx, art[0], art[1], art[2])
             # print('{2}/{0}({1})'.format(*art))
 
-    def calc_all(self):
-        """calc_all
-        """
-        self.writer.select_articles()
-
 
 def print_usage():
     """Print Usage
@@ -281,11 +215,9 @@ if __name__ == '__main__':
         print_usage()
         sys.exit(0)
     elif sys.argv[1] == 'all':
-        WRITER = SqliteWriter()
-        WIKI = WikipediaCrawler(WRITER)
+        WIKI = WikipediaCrawler()
         WIKI.fetch_all()
         # print(WIKI.fetch_article('天津市耀華中學', '/wiki/%E5%A4%A9%E6%B4%A5%E5%B8%82%E8%80%80%E5%8D%8E%E4%B8%AD%E5%AD%A6'))
     elif sys.argv[1] == 'calc':
-        WRITER = SqliteWriter()
-        WIKI = WikipediaCrawler(WRITER)
+        WIKI = WikipediaCrawler()
         WIKI.calc_all()
