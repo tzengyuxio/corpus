@@ -170,8 +170,11 @@ class AppleForumCrawler():
             ul_tag = soup.find('ul', {'class': 'auallt'})
             if ul_tag is None:
                 break
+            li_tags = ul_tag.find_all('li')
+            if li_tags is None or len(li_tags) == 0:
+                break
             art_list = []
-            for li_tag in ul_tag.find_all('li'):
+            for li_tag in li_tags:
                 a_tag = li_tag.find('a')
                 if a_tag is None:
                     continue
