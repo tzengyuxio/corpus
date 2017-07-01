@@ -16,9 +16,11 @@ CREATE TABLE IF NOT EXISTS articles (
     PRIMARY KEY(src, idx)
 )
 '''
-
 SQL_INSERT_ARTICLES = '''
 INSERT OR IGNORE INTO articles VALUES (?, ?, ?, ?, ?, ?, ?)
+'''
+SQL_SELECT_ARTICLES = '''
+SELECT * FROM articles
 '''
 
 
@@ -33,6 +35,57 @@ class HanziCalculator():
         cur.execute(SQL_CREATE_ARTICLES)
         self.conn.commit()
         cur.close()
+
+    def save_report(self, all_hz_freq, report_file):
+        """save report to csv file
+        """
+        accum_count = 0
+        all_hz_sum = sum(all_hz_freq.values())
+        with open(report_file, 'w', encoding='utf8', newline='') as fout:
+            writer = csv.writer(fout, delimiter=',', quotechar='"',
+                                quoting=csv.QUOTE_MINIMAL)
+            writer.writerow(
+                ['字頻序號', '字', '擴展', '出現頻次', '出現頻率', '累積頻次', '累積頻率'])
+            for i, item in enumerate(sorted(all_hz_freq.items(),
+                                            key=lambda x: x[1], reverse=True)):
+                is_ext = 'ext' if is_unihan_ext(item[0]) else ''
+                accum_count += item[1]
+                writer.writerow([i + 1, item[0], is_ext,
+                                 item[1], item[1] / all_hz_sum,
+                                 accum_count, accum_count / all_hz_sum])
+
+    def print_result(self, header, text_cnt, uniq_cnt, char_sum):
+        """print result
+        """
+        print('')
+        print('### [{0}] ##############################'.format(header))
+        print('  total text cnt: {0:>12,}'.format(text_cnt))
+        print('  hanzi uniq cnt: {0:>12,}'.format(uniq_cnt))
+        print('  hanzi char sum: {0:>12,}'.format(char_sum))
+        print('')
+
+    def calc_all(self, db_file, report_file):
+        """calc all in freq db
+        """
+        conn = sqlite3.connect(db_file)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        all_hz_freq = {}
+        art_cnt = 0
+        for i, row in enumerate(cur.execute(SQL_SELECT_ARTICLES)):
+            print('{0} INFO {1:,} calc article[{2}]... hanzi cnt/sum: {3}/{4}'.format(
+                datetime_iso(), i, row['idx'], row['hanzi_cnt'], row['hanzi_sum']))
+            chr_freq = json.loads(row['stats'])
+            for char in chr_freq:
+                if char in all_hz_freq:
+                    all_hz_freq[char] += chr_freq[char]
+                else:
+                    all_hz_freq[char] = chr_freq[char]
+            art_cnt += 1
+
+        self.save_report(all_hz_freq, report_file)
+        self.print_result(report_file, art_cnt,
+                          len(all_hz_freq), sum(all_hz_freq).values())
 
     def calc_articles(self, src, src_db_name, sql_query):
         """calc hanzi freq articles
@@ -67,37 +120,20 @@ class HanziCalculator():
             cur = self.conn.cursor()
             cur.execute(SQL_INSERT_ARTICLES, rec)
             print('{0} INFO {1:05} calc article[{2}]... hanzi cnt/sum: {3}/{4}'.format(
-                datetime_iso(), i, idx, hanzi_cnt, hanzi_sum))
+                datetime_iso(), i + 1, idx, hanzi_cnt, hanzi_sum))
         src_cur.close()
         self.conn.commit()
 
-        # save report to csv file
-        accum_count = 0
-        all_hz_sum = sum(all_hz_freq.values())
-        filename = 'report-{0}.csv'.format(src)
-        with open(filename, 'w', encoding='utf8', newline='') as fout:
-            writer = csv.writer(fout, delimiter=',', quotechar='"',
-                                quoting=csv.QUOTE_MINIMAL)
-            writer.writerow(
-                ['字頻序號', '字', '擴展', '出現頻次', '出現頻率', '累積頻次', '累積頻率'])
-            for i, item in enumerate(sorted(all_hz_freq.items(),
-                                            key=lambda x: x[1], reverse=True)):
-                is_ext = 'ext' if is_unihan_ext(item[0]) else ''
-                accum_count += item[1]
-                writer.writerow([i + 1, item[0], is_ext,
-                                 item[1], item[1] / all_hz_sum,
-                                 accum_count, accum_count / all_hz_sum])
-
-        print('')
-        print('### [{0}] ##############################'.format(src))
-        print('  total text cnt: {0:>12,}'.format(art_cnt))
-        print('  hanzi uniq cnt: {0:>12,}'.format(len(all_hz_freq)))
-        print('  hanzi char sum: {0:>12,}'.format(sum(all_hz_freq.values())))
-        print('')
+        self.save_report(all_hz_freq, 'report-{0}.csv'.format(src))
+        self.print_result(src, art_cnt,
+                          len(all_hz_freq), sum(all_hz_freq).values())
 
 
 if __name__ == '__main__':
-    if sys.argv[1] == 'forum':
+    if sys.argv[1] == 'all':
+        CALC = HanziCalculator()
+        CALC.calc_all('hzfreq.db', 'report-all.csv')
+    elif sys.argv[1] == 'forum':
         CALC = HanziCalculator(db_name='hzfreq-forum.db')
         FID = sys.argv[2]
         CALC.calc_articles(

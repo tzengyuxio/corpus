@@ -1,4 +1,9 @@
 
+### [report-all.csv] ##############################
+  total text cnt:      149,748
+  hanzi uniq cnt:        9,183
+  hanzi char sum:  162,129,271
+
 ### [news.apple] ##############################
   total text cnt:      100,753
   hanzi uniq cnt:        7,538
