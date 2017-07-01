@@ -73,6 +73,7 @@ class HanziCalculator():
 
         # save report to csv file
         accum_count = 0
+        all_hz_sum = sum(all_hz_freq.values())
         filename = 'report-{0}.csv'.format(src)
         with open(filename, 'w', encoding='utf8', newline='') as fout:
             writer = csv.writer(fout, delimiter=',', quotechar='"',
@@ -84,8 +85,8 @@ class HanziCalculator():
                 is_ext = 'ext' if is_unihan_ext(item[0]) else ''
                 accum_count += item[1]
                 writer.writerow([i + 1, item[0], is_ext,
-                                 item[1], item[1] / hanzi_sum,
-                                 accum_count, accum_count / hanzi_sum])
+                                 item[1], item[1] / all_hz_sum,
+                                 accum_count, accum_count / all_hz_sum])
 
         print('')
         print('### [{0}] ##############################'.format(src))
