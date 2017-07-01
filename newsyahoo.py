@@ -240,9 +240,6 @@ if __name__ == '__main__':
     elif sys.argv[1] == 'all':
         CRAWLER = NewsYahooCrawler()
         CRAWLER.fetch_all()
-    elif sys.argv[1] == 'fetch':
-        NEWS = NewsYahooCrawler()
-        NEWS.fetch_all()
     elif sys.argv[1] == 'test':
         CRAWLER = NewsYahooCrawler()
         # CRAWLER.crawl_article()

@@ -2,11 +2,12 @@
 """Hanzi calculation
 """
 
+import csv
 import json
 import sqlite3
 import sys
 
-from utils import datetime_iso, is_unihan
+from utils import datetime_iso, is_unihan, is_unihan_ext
 
 
 SQL_CREATE_ARTICLES = '''
@@ -25,9 +26,9 @@ class HanziCalculator():
     """Hanzi Calculator
     """
 
-    def __init__(self):
+    def __init__(self, db_name='hzfreq.db'):
         # init db
-        self.conn = sqlite3.connect('hzfreq.db')
+        self.conn = sqlite3.connect(db_name)
         cur = self.conn.cursor()
         cur.execute(SQL_CREATE_ARTICLES)
         self.conn.commit()
@@ -69,6 +70,23 @@ class HanziCalculator():
                 datetime_iso(), i, idx, hanzi_cnt, hanzi_sum))
         src_cur.close()
         self.conn.commit()
+
+        # save report to csv file
+        accum_count = 0
+        filename = 'report-{0}.csv'.format(src)
+        with open(filename, 'w', encoding='utf8', newline='') as fout:
+            writer = csv.writer(fout, delimiter=',', quotechar='"',
+                                quoting=csv.QUOTE_MINIMAL)
+            writer.writerow(
+                ['字頻序號', '字', '擴展', '出現頻次', '出現頻率', '累積頻次', '累積頻率'])
+            for i, item in enumerate(sorted(all_hz_freq.items(),
+                                            key=lambda x: x[1], reverse=True)):
+                is_ext = 'ext' if is_unihan_ext(item[0]) else ''
+                accum_count += item[1]
+                writer.writerow([i + 1, item[0], is_ext,
+                                 item[1], item[1] / hanzi_sum,
+                                 accum_count, accum_count / hanzi_sum])
+
         print('')
         print('### [{0}] ##############################'.format(src))
         print('  total text cnt: {0:>12,}'.format(art_cnt))
@@ -78,8 +96,8 @@ class HanziCalculator():
 
 
 if __name__ == '__main__':
-    CALC = HanziCalculator()
     if sys.argv[1] == 'forum':
+        CALC = HanziCalculator(db_name='hzfreq-forum.db')
         FID = sys.argv[2]
         CALC.calc_articles(
             'appledaily.forum.{0}'.format(FID),
@@ -89,6 +107,7 @@ if __name__ == '__main__':
                FROM articles WHERE forum_id="{0}"'''.format(FID)
         )
     elif sys.argv[1] == 'apple':
+        CALC = HanziCalculator()
         CALC.calc_articles(
             'news.apple',
             'source-appledaily.db',
@@ -97,6 +116,7 @@ if __name__ == '__main__':
                FROM articles'''
         )
     elif sys.argv[1] == 'books':
+        CALC = HanziCalculator()
         CALC.calc_articles(
             'books',
             'source-books.db',
@@ -104,6 +124,7 @@ if __name__ == '__main__':
                FROM articles'''
         )
     elif sys.argv[1] == 'cnyes':
+        CALC = HanziCalculator()
         CALC.calc_articles(
             'mag.cnyes',
             'source-magcnyes.db',
@@ -112,6 +133,7 @@ if __name__ == '__main__':
                FROM articles'''
         )
     elif sys.argv[1] == 'yahoo':
+        CALC = HanziCalculator()
         CALC.calc_articles(
             'news.yahoo',
             'source-newsyahoo.db',
@@ -120,6 +142,7 @@ if __name__ == '__main__':
                FROM articles'''
         )
     elif sys.argv[1] == 'wiki':
+        CALC = HanziCalculator()
         CALC.calc_articles(
             'wikipedia',
             'source-wikipedia.db',

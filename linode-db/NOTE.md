@@ -1,23 +1,23 @@
 
 ### [news.apple] ##############################
-  total text cnt:      100,720
+  total text cnt:      100,753
   hanzi uniq cnt:        7,538
-  hanzi char sum:   75,681,350
+  hanzi char sum:   75,704,207
 
 ### [books] ##############################
-  total text cnt:        1,356
-  hanzi uniq cnt:        5,661
-  hanzi char sum:    5,450,184
+  total text cnt:        1,385
+  hanzi uniq cnt:        5,673
+  hanzi char sum:    5,565,781
 
 ### [mag.cnyes] ##############################
-  total text cnt:       45,428
-  hanzi uniq cnt:        7,862
-  hanzi char sum:   74,807,408
+  total text cnt:       45,750
+  hanzi uniq cnt:        7,870
+  hanzi char sum:   75,275,618
 
 ### [news.yahoo] ##############################
-  total text cnt:        1,180
-  hanzi uniq cnt:        4,278
-  hanzi char sum:      829,492
+  total text cnt:        1,240
+  hanzi uniq cnt:        4,315
+  hanzi char sum:      873,654
 
 ### [wikipedia] ##############################
   total text cnt:          620
