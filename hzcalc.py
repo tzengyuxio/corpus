@@ -22,6 +22,9 @@ INSERT OR IGNORE INTO articles VALUES (?, ?, ?, ?, ?, ?, ?)
 SQL_SELECT_ARTICLES = '''
 SELECT * FROM articles
 '''
+SQL_SELECT_BY_FORUM_ID = '''
+SELECT art_id, title, article FROM articles WHERE forum_id=? AND article like "%男女%" LIMIT 500
+'''
 
 
 class HanziCalculator():
@@ -128,6 +131,20 @@ class HanziCalculator():
         self.print_result(src, art_cnt,
                           len(all_hz_freq), sum(all_hz_freq).values())
 
+    def dump_forum(self, src_db_name, fid):
+        """dump forum to text file
+        """
+        txt = ''
+        conn = sqlite3.connect(src_db_name)
+        cur = conn.cursor()
+        for row in cur.execute(SQL_SELECT_BY_FORUM_ID, [fid]):
+            # txt += '{0}\n\n{1}\n\n\n'.format(row[1], row[2])
+            txt += '{0}\n'.format(row[2])
+        filename = 'dump-forum-{0}.txt'.format(fid)
+        with open(filename, 'w', encoding='utf8') as fout:
+            fout.write(txt)
+        print('\nfile {0} saved\n'.format(filename))
+
 
 if __name__ == '__main__':
     if sys.argv[1] == 'all':
@@ -187,3 +204,7 @@ if __name__ == '__main__':
                title || x'0a0a' || article AS raw_text
                FROM articles'''
         )
+    elif sys.argv[1] == 'dump':
+        CALC = HanziCalculator(db_name='hzfreq-forum.db')
+        FID = sys.argv[2]
+        CALC.dump_forum('source-forum.db', FID)
