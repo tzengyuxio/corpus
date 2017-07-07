@@ -88,7 +88,7 @@ class HanziCalculator():
 
         self.save_report(all_hz_freq, report_file)
         self.print_result(report_file, art_cnt,
-                          len(all_hz_freq), sum(all_hz_freq).values())
+                          len(all_hz_freq), sum(all_hz_freq.values()))
 
     def calc_articles(self, src, src_db_name, sql_query):
         """calc hanzi freq articles
@@ -129,7 +129,7 @@ class HanziCalculator():
 
         self.save_report(all_hz_freq, 'report-{0}.csv'.format(src))
         self.print_result(src, art_cnt,
-                          len(all_hz_freq), sum(all_hz_freq).values())
+                          len(all_hz_freq), sum(all_hz_freq.values()))
 
     def dump_forum(self, src_db_name, fid):
         """dump forum to text file
