@@ -15,17 +15,18 @@ from utils import PARSER
 
 SQL_CREATE_TABLE_ARTICLES = '''
 CREATE TABLE IF NOT EXISTS articles (
-    title TEXT, open_date TEXT, category TEXT, url TEXT, article TEXT,
+    title TEXT, open_date TEXT, quality TEXT, category TEXT, url TEXT, article TEXT,
     PRIMARY KEY(title, open_date))
 '''
 SQL_CONTAIN_ARTICLE = '''
 SELECT 1 FROM articles WHERE title=?
 '''
 SQL_INSERT_ARTICLE = '''
-INSERT OR IGNORE INTO articles (title, open_date, category, url, article) VALUES (?, ?, ?, ?, ?)
+INSERT OR IGNORE INTO articles (title, open_date, quality, category, url, article) VALUES (?, ?, ?, ?, ?, ?)
 '''
 
-URL_WIKI_LIST = 'https://zh.wikipedia.org/zh-tw/Wikipedia:%E7%89%B9%E8%89%B2%E6%9D%A1%E7%9B%AE'
+URL_WIKI_FA_LIST = 'https://zh.wikipedia.org/zh-tw/Wikipedia:%E7%89%B9%E8%89%B2%E6%9D%A1%E7%9B%AE'
+URL_WIKI_GA_LIST = 'https://zh.wikipedia.org/zh-tw/Wikipedia:%E5%84%AA%E8%89%AF%E6%A2%9D%E7%9B%AE'
 URL_WIKI_ARTICLE = 'https://zh.wikipedia.org/zh-tw/{0}'
 
 
@@ -94,7 +95,7 @@ class WikipediaCrawler():
         self.conn.commit()
         cur.close()
 
-    def fetch_article(self, idx, title, href, cate):
+    def fetch_article(self, idx, title, href, cate, quality):
         """fetch_article
         """
         self.logger.info('%03d fetching article [%s](%s)...', idx, title, href)
@@ -141,16 +142,16 @@ class WikipediaCrawler():
 
         soup.decompose()
         the_date = datetime.now().strftime('%Y-%m-%d')
-        art_val = [title, the_date, cate, href, cont.text.strip()]
+        art_val = [title, the_date, quality, cate, href, cont.text.strip()]
         self.insert_article(art_val)
         self.logger.info(
             '          -> article [%s] with %d char saved', title, len(cont.text))
         return
 
-    def fetch_all(self):
-        """fetch_all
+    def fetch_all_featured(self):
+        """fetch_all featured
         """
-        soup = BeautifulSoup(urlopen(URL_WIKI_LIST), PARSER)
+        soup = BeautifulSoup(urlopen(URL_WIKI_FA_LIST), PARSER)
 
         # starting tag node of featured article links
         node = soup.find(id='content').find_all('table')[3].find_all('td')[0]
@@ -198,8 +199,67 @@ class WikipediaCrawler():
 
         # save to db
         for idx, art in enumerate(articles):
-            self.fetch_article(idx, art[0], art[1], art[2])
-            # print('{2}/{0}({1})'.format(*art))
+            self.fetch_article(idx + 1, art[0], art[1], art[2], "featured")
+            # print('{3} {2}/{0}({1})'.format(*art, idx+1))
+
+    def fetch_all_good(self):
+        """fetch_all good
+        """
+        soup = BeautifulSoup(urlopen(URL_WIKI_GA_LIST), PARSER)
+
+        # starting tag node of featured article links
+        node = soup.find(id='content').find(
+            'table', {'class': 'prettytable'})  # .find('tbody')
+
+        if node is None:
+            print('node is None')
+
+        # parse page content and generate category list
+        articles = []
+        cate_h2 = None
+        cate_h3 = None
+        cate_h4 = None
+        # curr_level = 2
+        for td_tag in node.find_all('td'):
+            for child in td_tag.children:
+                if child.name is None:
+                    continue
+                elif child.name == 'h3':
+                    cate_h2 = child.text.split('（')[0]
+                    cate_h3 = None
+                    cate_h4 = None
+                    # curr_level = 2
+                    # print('{0}: {1}'.format(curr_level, cate_h2))
+                elif child.name == 'ul':
+                    for li_tag in child.find_all('li'):
+                        cate_h3 = li_tag.find('b').text
+                        cate_h4 = None
+                        # curr_level = 3
+                        # print('  {0}: {1}'.format(curr_level, cate_h3))
+                        category = '{0}/{1}'.format(cate_h2, cate_h3)
+                        for tag in li_tag.find_all('a'):
+                            if 'File:' in tag.get('href'):
+                                continue
+                            articles.append(
+                                [tag.get_text(), tag.get('href'), category])
+                elif child.name == 'dl':
+                    for dd_tag in child.find_all('dd'):
+                        cate_h4 = dd_tag.find('b').text
+                        # curr_level = 4
+                        # print('    {0}: {1}'.format(curr_level, cate_h4))
+                        category = '{0}/{1}/{2}'.format(cate_h2,
+                                                        cate_h3, cate_h4)
+                        for tag in dd_tag.find_all('a'):
+                            if 'File:' in tag.get('href'):
+                                continue
+                            articles.append(
+                                [tag.get_text(), tag.get('href'), category])
+        soup.decompose()
+
+        # save to db
+        for idx, art in enumerate(articles):
+            self.fetch_article(idx+1, art[0], art[1], art[2], "good")
+            # print('{3} {2}/{0}({1})'.format(*art, idx + 1))
 
 
 def print_usage():
@@ -216,8 +276,6 @@ if __name__ == '__main__':
         sys.exit(0)
     elif sys.argv[1] == 'all':
         WIKI = WikipediaCrawler()
-        WIKI.fetch_all()
+        WIKI.fetch_all_featured()
+        WIKI.fetch_all_good()
         # print(WIKI.fetch_article('天津市耀華中學', '/wiki/%E5%A4%A9%E6%B4%A5%E5%B8%82%E8%80%80%E5%8D%8E%E4%B8%AD%E5%AD%A6'))
-    elif sys.argv[1] == 'calc':
-        WIKI = WikipediaCrawler()
-        WIKI.calc_all()
