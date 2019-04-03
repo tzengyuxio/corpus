@@ -136,7 +136,7 @@ class BooksCrawler():
                 sleep(1)
             print(']')
         else:
-            sleep(randint(2, 4))
+            sleep(randint(3, 7))
 
     def contain_book(self, book_no):
         """check if contains book
@@ -311,7 +311,7 @@ class BooksCrawler():
                 book_no = href.rsplit('/', 1)[-1].split('?')[0]
                 self.insert_subject([cate_name, top_no, book_no, title, author])
                 self.crawl_book(book_no, title, author)
-                print(book_no, title, author, href)
+                # print(book_no, title, author, href)
             soup.decompose()
 
     def fetch_all_categories(self):
@@ -362,3 +362,7 @@ if __name__ == '__main__':
         # CRAWLER.crawl_month(2017, 5)
         # CRAWLER.crawl_book('0010592444', '謎情柯洛斯III', '林奕含')
         CRAWLER.crawl_book('0010521950', '怦然心動的人生整理魔法', '近藤麻理惠')
+
+# TODO
+# 1. request timeout 408
+# 2. dont fetch page again
