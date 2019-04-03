@@ -310,7 +310,7 @@ class BooksCrawler():
                 href = h4.a.get('href')
                 book_no = href.rsplit('/', 1)[-1].split('?')[0]
                 self.insert_subject([cate_name, top_no, book_no, title, author])
-                # self.crawl_book(book_no, title, author)
+                self.crawl_book(book_no, title, author)
                 print(book_no, title, author, href)
             soup.decompose()
 
