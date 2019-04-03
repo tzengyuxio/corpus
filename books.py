@@ -31,6 +31,12 @@ CREATE TABLE IF NOT EXISTS rankings (
     PRIMARY KEY(year, month, ranking)
 )
 '''
+SQL_CREATE_TABLE_SUBJECTS = '''
+CREATE TABLE IF NOT EXISTS subjects (
+    subj TEXT, ranking INTEGER, book_no TEXT, title TEXT, author TEXT,
+    PRIMARY KEY(subj, ranking)
+)
+'''
 SQL_CONTAIN_BOOK = '''
 SELECT 1 FROM books WHERE book_no=?
 '''
@@ -44,11 +50,25 @@ INSERT OR IGNORE INTO books (book_no, page_cnt) VALUES (?, ?)
 SQL_INSERT_RANKING = '''
 INSERT OR IGNORE INTO rankings (year, month, ranking, book_no, title, author) VALUES (?, ?, ?, ?, ?, ?)
 '''
+SQL_INSERT_SUBJECT = '''
+INSERT OR IGNORE INTO subjects (subj, ranking, book_no, title, author) VALUES (?, ?, ?, ?, ?)
+'''
 
 URL_MONTHTOPB = 'http://www.books.com.tw/web/sys_monthtopb/books/?year={0}&month={1}'
 URL_PRODUCT = 'http://www.books.com.tw/products/{0}'
 URL_SERIALTEXT = 'http://www.books.com.tw/web/sys_serialtext/?item={0}'
 URL_SERIALTEXT_PAGE = URL_SERIALTEXT + '&page={1}'
+URL_SUBLISTB = 'https://www.books.com.tw/web/sys_sublistb/books/?loc=subject_011'
+
+
+def print_cate_tree(cate, tier):
+    """print_cate_tree
+    有 950 個分類要查
+    """
+    print(' ' * tier * 4 + cate[0])
+    if len(cate[2]) != 0:
+        for subcate in cate[2]:
+            print_cate_tree(subcate, tier+1)
 
 
 class BooksCrawler():
@@ -69,6 +89,7 @@ class BooksCrawler():
         cur.execute(SQL_CREATE_TABLE_ARTICLES)
         cur.execute(SQL_CREATE_TABLE_BOOKS)
         cur.execute(SQL_CREATE_TABLE_RANKINGS)
+        cur.execute(SQL_CREATE_TABLE_SUBJECTS)
         self.conn.commit()
         cur.close()
 
@@ -188,6 +209,14 @@ class BooksCrawler():
         self.conn.commit()
         cur.close()
 
+    def insert_subject(self, subject_values):
+        """insert subject
+        """
+        cur = self.conn.cursor()
+        cur.execute(SQL_INSERT_SUBJECT, subject_values)
+        self.conn.commit()
+        cur.close()
+
     def crawl_book(self, book_no, title, author):
         """crawl book
         return values list of book
@@ -225,6 +254,8 @@ class BooksCrawler():
 
     def crawl_month(self, year, month):
         """crawl_month
+        爬榜，會將每個月排行榜資料放到 `rankings` TABLE
+        對排行榜上每本書做資料收集
         """
         self.logger.info('fetching TOP 100 of %4d-%02d...', year, month)
         self.sleep()
@@ -242,6 +273,8 @@ class BooksCrawler():
 
     def fetch_all(self):
         """fetch_all
+        2013 七月 ~ 2017 七月 共 49 個月的排行榜資料
+        對每個月做月排行榜資料收集
         """
         start = (2013, 7)
         end = (2017, 7)
@@ -250,6 +283,59 @@ class BooksCrawler():
             end_month = end[1] if year == end[0] else 13
             for month in range(start_month, end_month):
                 self.crawl_month(year, month)
+
+    def fetch_one_category(self, cate, parents):
+        """fetch_one_category
+        """
+        cate_name = parents + ('>' + cate[0])
+        if len(cate[2]) != 0:
+            # parents = cate[1] if parents == '' else parents + '/' + cate[1]
+            for sub_cate in cate[2]:
+                self.fetch_one_category(sub_cate, cate_name)
+        else:
+            self.logger.info('fetching TOP 100 of %s...', cate_name)
+            self.sleep()
+            tail = cate[1].rsplit('/', 1)[-1]
+            url = cate[1].replace(tail, '?v=1&o=5')
+            soup = BeautifulSoup(urlopen(url), PARSER)
+            top_no = 0
+            for h4 in soup.find_all('h4'):
+                div_text_cont = h4.find_next_sibling('div')
+                if div_text_cont is None:
+                    continue
+                top_no += 1
+                # top_no = div.parent.find('strong', {'class': 'no'}).text
+                title = h4.text
+                author = h4.find_next_sibling('ul').li.a.text
+                href = h4.a.get('href')
+                book_no = href.rsplit('/', 1)[-1].split('?')[0]
+                self.insert_subject([cate_name, top_no, book_no, title, author])
+                # self.crawl_book(book_no, title, author)
+                print(book_no, title, author, href)
+            soup.decompose()
+
+    def fetch_all_categories(self):
+        """fetch_all_categories
+        """
+        soup = BeautifulSoup(urlopen(URL_SUBLISTB), PARSER)
+        cate0 = ('中文書', URL_SUBLISTB, [])
+        for h4 in soup.find_all('h4'):
+            tbl = h4.find_next_sibling('table')
+            if tbl is None:
+                continue
+            cate1 = (h4.text, h4.a.get('href'), [])
+            cate0[2].append(cate1)
+            for tr in tbl.find_all('tr'):
+                cate2 = (tr.th.h5.text, tr.th.h5.a.get('href'), [])
+                cate1[2].append(cate2)
+                for li in tr.td.find_all('li'):
+                    if li.a is None:
+                        continue
+                    cate3 = (li.text, li.a.get('href'), [])
+                    cate2[2].append(cate3)
+        soup.decompose()
+        # print_cate_tree(cate0, 0)
+        self.fetch_one_category(cate0, '')
 
 
 def print_usage():
@@ -267,8 +353,12 @@ if __name__ == '__main__':
     elif sys.argv[1] == 'all':
         CRAWLER = BooksCrawler()
         CRAWLER.fetch_all()
+    elif sys.argv[1] == 'allcates':
+        CRAWLER = BooksCrawler()
+        CRAWLER.fetch_all_categories()
     elif sys.argv[1] == 'test':
         CRAWLER = BooksCrawler()
         # CRAWLER.crawl_book('0010743217', '房思琪的初戀樂園', '林奕含')
         # CRAWLER.crawl_month(2017, 5)
-        CRAWLER.crawl_book('0010592444', '謎情柯洛斯III', '林奕含')
+        # CRAWLER.crawl_book('0010592444', '謎情柯洛斯III', '林奕含')
+        CRAWLER.crawl_book('0010521950', '怦然心動的人生整理魔法', '近藤麻理惠')
