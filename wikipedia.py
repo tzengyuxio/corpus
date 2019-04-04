@@ -150,53 +150,27 @@ class WikipediaCrawler():
             '          -> article [%s] with %d char saved', title, len(cont.text))
         return
 
+    def find_cate(self, node):
+        h2 = node.find_previous_sibling('h2')
+        if h2 is None:
+            return self.find_cate(node.parent)
+        return h2.text
+
     def fetch_all_featured(self):
         """fetch_all featured
         """
         soup = BeautifulSoup(urlopen(URL_WIKI_FA_LIST), PARSER)
 
         # starting tag node of featured article links
-        node = soup.find(id='content').find_all('table')[3].find_all('td')[0]
+        node = soup.find(id='mw-content-text').find_all('table')[3].find_all('td')[0]
+        # print(node.text[:100])
 
-        # parse page content and generate category list
         articles = []
-        cate_h2 = None
-        cate_h3 = None
-        cate_h4 = None
-        curr_level = 2
-        for child in node.children:
-            if child.name is None:
+        for a_tag in node.find_all('a'):
+            a_href = a_tag.get('href')
+            if 'index.php' in a_href or 'meta.wikimedia.org' in a_href:
                 continue
-            elif child.name == 'h2':
-                cate_h2 = child.text
-                cate_h3 = None
-                cate_h4 = None
-                curr_level = 2
-            elif child.name == 'h3':
-                cate_h3 = child.text
-                cate_h4 = None
-                curr_level = 3
-            elif child.name == 'h4':
-                cate_h4 = child.text
-                curr_level = 4
-            elif child.name == 'p':
-                if curr_level == 2:
-                    category = '{0}'.format(cate_h2)
-                elif curr_level == 3:
-                    category = '{0}/{1}'.format(cate_h2, cate_h3)
-                elif curr_level == 4:
-                    category = '{0}/{1}/{2}'.format(cate_h2, cate_h3, cate_h4)
-                for tag in child.find_all('a'):
-                    if 'File:' in tag.get('href'):
-                        continue
-                    articles.append(
-                        [tag.get_text(), tag.get('href'), category])
-            elif child.name == 'ul':
-                break
-            else:
-                self.logger.error('unexpected tag: <%s>', child.name)
-                break
-
+            articles.append([a_tag.text, a_href, self.find_cate(a_tag)])
         soup.decompose()
 
         # save to db
