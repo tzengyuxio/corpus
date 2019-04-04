@@ -317,6 +317,7 @@ class BooksCrawler():
         self.insert_article(article_values)
         self.logger.info(
             '      -> book[%s] %s %d pages saved', book_no, title, page_cnt)
+        sleep(24)
 
     def crawl_month(self, year, month):
         """crawl_month
