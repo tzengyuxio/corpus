@@ -42,6 +42,12 @@ CREATE TABLE IF NOT EXISTS subjects (
     PRIMARY KEY(subj, ranking)
 )
 '''
+SQL_CREATE_TABLE_DONE_SUBJECTS = '''
+CREATE TABLE IF NOT EXISTS done_subjects (
+    subj_no TEXT, name TEXT, full_name TEXT,
+    PRIMARY KEY(subj_no)
+)
+'''
 SQL_CONTAIN_BOOK = '''
 SELECT 1 FROM books WHERE book_no=?
 '''
@@ -57,6 +63,9 @@ INSERT OR IGNORE INTO rankings (year, month, ranking, book_no, title, author) VA
 '''
 SQL_INSERT_SUBJECT = '''
 INSERT OR IGNORE INTO subjects (subj, ranking, book_no, title, author) VALUES (?, ?, ?, ?, ?)
+'''
+SQL_INSERT_DONE_SUBJECTS = '''
+INSERT OR IGNORE INTO done_subjects (subj_no, name, full_name) VALUES (?, ?, ?)
 '''
 
 URL_MONTHTOPB = 'http://www.books.com.tw/web/sys_monthtopb/books/?year={0}&month={1}'
@@ -136,6 +145,7 @@ class BooksCrawler():
         cur.execute(SQL_CREATE_TABLE_BOOKS)
         cur.execute(SQL_CREATE_TABLE_RANKINGS)
         cur.execute(SQL_CREATE_TABLE_SUBJECTS)
+        cur.execute(SQL_CREATE_TABLE_DONE_SUBJECTS)
         self.conn.commit()
         cur.close()
 
@@ -205,6 +215,10 @@ class BooksCrawler():
             page_cnt = int(span.text)
             soup.decompose()
             return page_cnt
+        except IndexError:
+            print()
+            print(req.text)
+            quit()
         except HTTPError:
             return 0
 
