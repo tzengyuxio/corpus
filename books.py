@@ -13,6 +13,11 @@ from bs4 import BeautifulSoup
 
 from utils import PARSER, is_unihan
 
+import time
+from functools import wraps
+import requests
+from requests.exceptions import ConnectionError, Timeout
+
 SQL_CREATE_TABLE_ARTICLES = '''
 CREATE TABLE IF NOT EXISTS articles (
     book_no TEXT, isbn TEXT, author TEXT, publisher TEXT, pub_date TEXT, title TEXT, article TEXT,
@@ -69,6 +74,47 @@ def print_cate_tree(cate, tier):
     if len(cate[2]) != 0:
         for subcate in cate[2]:
             print_cate_tree(subcate, tier+1)
+
+def retry(exceptions, tries=4, delay=3, backoff=2, logger=None):
+    """
+    Retry calling the decorated function using an exponential backoff.
+
+    Args:
+        exceptions: The exception to check. may be a tuple of
+            exceptions to check.
+        tries: Number of times to try (not retry) before giving up.
+        delay: Initial delay between retries in seconds.
+        backoff: Backoff multiplier (e.g. value of 2 will double the delay
+            each retry).
+        logger: Logger to use. If None, print.
+    """
+    def deco_retry(f):
+
+        @wraps(f)
+        def f_retry(*args, **kwargs):
+            mtries, mdelay = tries, delay
+            while mtries > 1:
+                try:
+                    return f(*args, **kwargs)
+                except exceptions as e:
+                    msg = '{}, Retrying in {} seconds...'.format(e, mdelay)
+                    if logger:
+                        logger.warning(msg)
+                    else:
+                        print(msg)
+                    time.sleep(mdelay)
+                    mtries -= 1
+                    mdelay *= backoff
+            return f(*args, **kwargs)
+
+        return f_retry  # true decorator
+
+    return deco_retry
+
+
+@retry(requests.exceptions.Timeout, delay=60)
+def call_books(url):
+    return requests.get(url, headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36'})
 
 
 class BooksCrawler():
@@ -153,7 +199,8 @@ class BooksCrawler():
         self.sleep()
         url = URL_SERIALTEXT.format(book_no)
         try:
-            soup = BeautifulSoup(urlopen(url), PARSER)
+            req = call_books(url)
+            soup = BeautifulSoup(req.text, PARSER)
             span = soup.find_all('div', {'class': 'page'})[-1].span
             page_cnt = int(span.text)
             soup.decompose()
@@ -167,7 +214,8 @@ class BooksCrawler():
         self.sleep()
         url = URL_PRODUCT.format(book_no)
         try:
-            soup = BeautifulSoup(urlopen(url), PARSER)
+            req = call_books(url)
+            soup = BeautifulSoup(req.text, PARSER)
             meta = soup.find('meta', {'itemprop': 'productID'})
             if meta is None:
                 return []
@@ -240,7 +288,8 @@ class BooksCrawler():
         for i in range(1, page_cnt + 1):
             self.sleep()
             url = URL_SERIALTEXT_PAGE.format(book_no, i)
-            soup = BeautifulSoup(urlopen(url), PARSER)
+            req = call_books(url)
+            soup = BeautifulSoup(req.text, PARSER)
             text = soup.find_all('div', {'class': 'cont'})[-1].text
             cont += text
             soup.decompose()
@@ -260,7 +309,8 @@ class BooksCrawler():
         self.logger.info('fetching TOP 100 of %4d-%02d...', year, month)
         self.sleep()
         url = URL_MONTHTOPB.format(year, month)
-        soup = BeautifulSoup(urlopen(url), PARSER)
+        req = call_books(url)
+        soup = BeautifulSoup(req.text, PARSER)
         for div in soup.find_all('div', {'class': 'type02_bd-a'}):
             top_no = div.parent.find('strong', {'class': 'no'}).text
             title = div.h4.text
@@ -297,7 +347,8 @@ class BooksCrawler():
             self.sleep()
             tail = cate[1].rsplit('/', 1)[-1]
             url = cate[1].replace(tail, '?v=1&o=5')
-            soup = BeautifulSoup(urlopen(url), PARSER)
+            req = call_books(url)
+            soup = BeautifulSoup(req.text, PARSER)
             top_no = 0
             for h4 in soup.find_all('h4'):
                 div_text_cont = h4.find_next_sibling('div')
@@ -317,7 +368,8 @@ class BooksCrawler():
     def fetch_all_categories(self):
         """fetch_all_categories
         """
-        soup = BeautifulSoup(urlopen(URL_SUBLISTB), PARSER)
+        req = call_books(URL_SUBLISTB)
+        soup = BeautifulSoup(req.text, PARSER)
         cate0 = ('中文書', URL_SUBLISTB, [])
         for h4 in soup.find_all('h4'):
             tbl = h4.find_next_sibling('table')
