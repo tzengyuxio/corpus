@@ -25,8 +25,10 @@ SQL_INSERT_ARTICLE = '''
 INSERT OR IGNORE INTO articles (title, open_date, quality, category, url, article) VALUES (?, ?, ?, ?, ?, ?)
 '''
 
-URL_WIKI_FA_LIST = 'https://zh.wikipedia.org/zh-tw/Wikipedia:%E7%89%B9%E8%89%B2%E6%9D%A1%E7%9B%AE'
-URL_WIKI_GA_LIST = 'https://zh.wikipedia.org/zh-tw/Wikipedia:%E5%84%AA%E8%89%AF%E6%A2%9D%E7%9B%AE'
+# URL_WIKI_FA_LIST = 'https://zh.wikipedia.org/zh-tw/Wikipedia:%E7%89%B9%E8%89%B2%E6%9D%A1%E7%9B%AE'
+# URL_WIKI_GA_LIST = 'https://zh.wikipedia.org/zh-tw/Wikipedia:%E5%84%AA%E8%89%AF%E6%A2%9D%E7%9B%AE'
+URL_WIKI_FA_LIST = 'https://zh.wikipedia.org/zh-tw/Wikipedia:%E5%85%B8%E8%8C%83%E6%9D%A1%E7%9B%AE'
+URL_WIKI_GA_LIST = 'https://zh.wikipedia.org/zh-tw/Wikipedia:%E4%BC%98%E8%89%AF%E6%9D%A1%E7%9B%AE'
 URL_WIKI_ARTICLE = 'https://zh.wikipedia.org/zh-tw/{0}'
 
 
