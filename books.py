@@ -327,7 +327,15 @@ class BooksCrawler():
             url = URL_SERIALTEXT_PAGE.format(book_no, i)
             req = call_books(url)
             soup = BeautifulSoup(req.text, PARSER)
-            text = soup.find_all('div', {'class': 'cont'})[-1].text
+            conts = soup.find_all('div', {'class': 'cont'})
+            while len(conts) != 0:
+                self.logger.warning('      -> book[%s][%d] IndexError, retry...', book_no, i)
+                sleep(36)
+                req = call_books(url)
+                soup = BeautifulSoup(req.text, PARSER)
+                conts = soup.find_all('div', {'class': 'cont'})
+            # text = soup.find_all('div', {'class': 'cont'})[-1].text
+            text = conts[-1].text
             cont += text
             soup.decompose()
 
