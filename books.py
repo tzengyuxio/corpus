@@ -51,6 +51,9 @@ CREATE TABLE IF NOT EXISTS done_subjects (
 SQL_CONTAIN_BOOK = '''
 SELECT 1 FROM books WHERE book_no=?
 '''
+SQL_CONTAIN_DONE_SUBJECT = '''
+SELECT 1 FROM done_subjects WHERE subj_no=?
+'''
 SQL_INSERT_ARTICLE = '''
 INSERT OR IGNORE INTO articles
     (book_no, isbn, author, publisher, pub_date, title, article) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -64,7 +67,7 @@ INSERT OR IGNORE INTO rankings (year, month, ranking, book_no, title, author) VA
 SQL_INSERT_SUBJECT = '''
 INSERT OR IGNORE INTO subjects (subj, ranking, book_no, title, author) VALUES (?, ?, ?, ?, ?)
 '''
-SQL_INSERT_DONE_SUBJECTS = '''
+SQL_INSERT_DONE_SUBJECT = '''
 INSERT OR IGNORE INTO done_subjects (subj_no, name, full_name) VALUES (?, ?, ?)
 '''
 
@@ -203,6 +206,15 @@ class BooksCrawler():
         cur.close()
         return result
 
+    def contain_done_subject(self, subj_no):
+        """check if contains done subject
+        """
+        cur = self.conn.cursor()
+        cur.execute(SQL_CONTAIN_DONE_SUBJECT, [subj_no])
+        result = True if cur.fetchone() is not None else False
+        cur.close()
+        return result
+
     def get_page_count(self, book_no):
         """get page count
         """
@@ -282,6 +294,14 @@ class BooksCrawler():
         self.conn.commit()
         cur.close()
 
+    def insert_done_subject(self, subj_no, name, full_name):
+        """insert done subject
+        """
+        cur = self.conn.cursor()
+        cur.execute(SQL_INSERT_DONE_SUBJECT, (subj_no, name, full_name))
+        self.conn.commit()
+        cur.close()
+
     def crawl_book(self, book_no, title, author):
         """crawl book
         return values list of book
@@ -355,12 +375,16 @@ class BooksCrawler():
     def fetch_one_category(self, cate, parents):
         """fetch_one_category
         """
+        subj_no = cate[1].rsplit('=', 1)[-1]
         cate_name = parents + ('>' + cate[0])
         if len(cate[2]) != 0:
             # parents = cate[1] if parents == '' else parents + '/' + cate[1]
             for sub_cate in cate[2]:
                 self.fetch_one_category(sub_cate, cate_name)
         else:
+            if self.contain_done_subject(subj_no):
+                self.logger.info('      -> subject[%s] contained and skip', subj_no)
+                return
             self.logger.info('fetching TOP 100 of %s...', cate_name)
             self.sleep()
             tail = cate[1].rsplit('/', 1)[-1]
@@ -382,6 +406,7 @@ class BooksCrawler():
                 self.crawl_book(book_no, title, author)
                 # print(book_no, title, author, href)
             soup.decompose()
+            self.insert_done_subject(subj_no, cate[0], cate_name)
 
     def fetch_all_categories(self):
         """fetch_all_categories
