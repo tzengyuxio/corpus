@@ -112,7 +112,7 @@ class WikipediaCrawler():
         # remove siteSub
         soup.find(id='siteSub').extract()
         # remove TOC
-        if soup.find(id='toc' is not None):
+        if soup.find(id='toc') is not None:
             soup.find(id='toc').extract()
         # remove div class=refbegin (reference)
         for elem in soup.find_all('div', {'class': 'refbegin'}):
