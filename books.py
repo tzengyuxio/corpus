@@ -328,7 +328,7 @@ class BooksCrawler():
             req = call_books(url)
             soup = BeautifulSoup(req.text, PARSER)
             conts = soup.find_all('div', {'class': 'cont'})
-            while len(conts) != 0:
+            while len(conts) == 0:
                 self.logger.warning('      -> book[%s][%d] IndexError, retry...%s', book_no, i, url)
                 sleep(36)
                 req = call_books(url)
