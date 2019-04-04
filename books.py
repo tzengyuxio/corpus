@@ -216,9 +216,12 @@ class BooksCrawler():
             soup.decompose()
             return page_cnt
         except IndexError:
-            print()
-            print(req.text)
-            quit()
+            # print('--IndexError----------------------------')
+            # print(url)
+            # print('----------------------------------------')
+            # print(req.text)
+            # quit()
+            return 0
         except HTTPError:
             return 0
 
